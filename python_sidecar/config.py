@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — python_sidecar/config.py
+# SynthesisOverthrust — python_sidecar/config.py
 # Single settings object — reads from env vars with sane defaults.
 # ============================================================
 
@@ -11,7 +11,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="NF_", case_sensitive=False)
 
-    IDENTIFIER: str = "com.neuralforge.app"
+    IDENTIFIER: str = "com.synthesisoverthrust.app"
 
     # ── Server ────────────────────────────────────────────────────────────────
     PORT:       int  = 7731
@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # ── Data paths ────────────────────────────────────────────────────────────
     DATA_DIR:   str  = str(Path.home() / f".local/share/{IDENTIFIER}")
-    DB_PATH:    str  = str(Path.home() / f".local/share/{IDENTIFIER}/neural_forge.db")
+    DB_PATH:    str  = str(Path.home() / f".local/share/{IDENTIFIER}/synthesis_overthrust.db")
     VAULT_PATH: str  = ""          # set in app Settings UI
     PLUGIN_DIR: str  = str(Path.home() / f".local/share/{IDENTIFIER}/plugins")
     BACKUP_DIR: str  = str(Path.home() / f".local/share/{IDENTIFIER}")

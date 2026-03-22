@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — sync/router.py
+# SynthesisOverthrust — sync/router.py
 # Obsidian sync endpoints: status, write-back, conflicts
 # ============================================================
 

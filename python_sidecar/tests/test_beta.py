@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge v1.0.0-beta — python_sidecar/tests/test_beta.py
+# SynthesisOverthrust v0.1.0-alpha — python_sidecar/tests/test_beta.py
 # Integration test suite covering all three phases.
 # Run: uv run pytest tests/test_beta.py -v
 # ============================================================
@@ -337,8 +337,8 @@ class TestBackup:
     def test_snapshot_filename_format(self):
         from datetime import datetime
         ts   = datetime(2026, 3, 9, 12, 0, 0)
-        name = f"neural_forge_{ts.strftime('%Y%m%d_%H%M%S')}.db"
-        assert name == "neural_forge_20260309_120000.db"
+        name = f"synthesis_overthrust_{ts.strftime('%Y%m%d_%H%M%S')}.db"
+        assert name == "synthesis_overthrust_20260309_120000.db"
 
 
 # ══════════════════════════════════════════════════════════════════════════════

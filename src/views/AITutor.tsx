@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/components/AITutor.tsx
+// SynthesisOverthrust — src/components/AITutor.tsx
 // AI Tutor: chat with Ollama, practice problem generator,
 // concept explainer, research paper ingestion
 // ============================================================

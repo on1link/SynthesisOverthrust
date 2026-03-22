@@ -1,26 +1,34 @@
 // ============================================================
-// Neural Forge — src/components/Vault.tsx
+// SynthesisOverthrust — src/components/Vault.tsx
 // Obsidian vault browser — connect, browse, preview, write
 // ============================================================
 
 import React, { useState } from "react";
-import {
-  C, F, card, glassCard, btn, tag, bar, fill,
-  h1, h2, h3, row, col_, grid, mono, inp,
-} from "../tokens";
-import type { UseGameState } from "../hooks/useGameState";
 import type { VaultNote } from "../api";
+import type { UseGameState } from "../hooks/useGameState";
+import {
+  C, F,
+  btn,
+  card,
+  col_,
+  glassCard,
+  h1, h2, h3,
+  inp,
+  mono,
+  row,
+  tag
+} from "../tokens";
 
 type Props = Pick<UseGameState, "vaultNotes" | "setVaultPath" | "readNote" | "writeNote">;
 
 export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }: Props) {
   const [vaultInput, setVaultInput] = useState("");
-  const [selNote,    setSelNote]    = useState<VaultNote | null>(null);
-  const [content,    setContent]    = useState("");
-  const [editing,    setEditing]    = useState(false);
-  const [saving,     setSaving]     = useState(false);
-  const [search,     setSearch]     = useState("");
-  const [loading,    setLoading]    = useState(false);
+  const [selNote, setSelNote] = useState<VaultNote | null>(null);
+  const [content, setContent] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [search, setSearch] = useState("");
+  const [loading, setLoading] = useState(false);
 
   const handleConnect = async () => {
     if (!vaultInput.trim()) return;
@@ -87,7 +95,7 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
                 Connect your Obsidian Vault
               </div>
               <div style={{ fontFamily: F.body, fontSize: 12, color: C.muted, lineHeight: 1.7 }}>
-                Neural Forge will watch your vault for changes, index all notes, and let you read &amp; write directly from here.
+                SynthesisOverthrust will watch your vault for changes, index all notes, and let you read &amp; write directly from here.
               </div>
             </div>
           </div>
@@ -132,7 +140,7 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
           }}>
             {vaultNotes.length === 0 ? (
               <div style={{ textAlign: "center", padding: 32, color: C.muted, fontFamily: F.body, fontSize: 12 }}>
-                No vault connected yet.<br/>Use the panel above.
+                No vault connected yet.<br />Use the panel above.
               </div>
             ) : filtered.length === 0 ? (
               <div style={{ textAlign: "center", padding: 24, color: C.muted, fontFamily: F.body, fontSize: 12 }}>
@@ -141,20 +149,20 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
             ) : (
               filtered.map(note => {
                 const isSel = selNote?.path === note.path;
-                const tags  = (() => { try { return JSON.parse(note.tags) as string[]; } catch { return []; } })();
+                const tags = (() => { try { return JSON.parse(note.tags) as string[]; } catch { return []; } })();
                 return (
                   <div key={note.path}
                     className="nf-card-hover"
                     onClick={() => handleOpenNote(note)}
                     style={{
-                      padding:      "10px 14px",
+                      padding: "10px 14px",
                       borderRadius: 8,
-                      cursor:       "pointer",
-                      background:   isSel ? `${C.teal}12` : "transparent",
-                      border:       `1px solid ${isSel ? C.teal + "44" : "transparent"}`,
+                      cursor: "pointer",
+                      background: isSel ? `${C.teal}12` : "transparent",
+                      border: `1px solid ${isSel ? C.teal + "44" : "transparent"}`,
                       marginBottom: 3,
                       "--hover-col": C.teal,
-                      transition:   "all 0.15s ease",
+                      transition: "all 0.15s ease",
                     } as React.CSSProperties}>
                     <div style={{ fontFamily: F.display, fontSize: 13, fontWeight: 600, color: isSel ? C.teal : C.text, marginBottom: 3 }}>
                       {note.title}
@@ -237,9 +245,9 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
                   style={{
                     ...inp,
                     minHeight: 420,
-                    resize:    "vertical",
+                    resize: "vertical",
                     fontFamily: F.mono,
-                    fontSize:  13,
+                    fontSize: 13,
                     lineHeight: 1.9,
                     borderColor: `${C.teal}55`,
                   }}
@@ -288,7 +296,7 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
                 Select a note to preview
               </div>
               <div style={{ fontFamily: F.body, fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.7 }}>
-                Your Obsidian notes are indexed in real-time.<br/>
+                Your Obsidian notes are indexed in real-time.<br />
                 Phase 2 will add semantic search and AI Q&amp;A.
               </div>
             </div>

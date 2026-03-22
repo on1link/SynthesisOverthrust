@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — llm/ingest.py
+# SynthesisOverthrust — llm/ingest.py
 # Paper ingestion: PDF → text → structured digest → Obsidian note
 # ============================================================
 
@@ -83,7 +83,7 @@ async def _write_paper_note(digest: dict, original_filename: str) -> Optional[st
         return None
 
     vault = Path(settings.VAULT_PATH)
-    papers_dir = vault / "NeuralForge" / "Papers"
+    papers_dir = vault / "SynthesisOverthrust" / "Papers"
     papers_dir.mkdir(parents=True, exist_ok=True)
 
     title      = digest.get("title") or Path(original_filename).stem

@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — analytics/router.py
+# SynthesisOverthrust — analytics/router.py
 # Learning analytics: XP trends, skill velocity, SR health,
 # sleep-performance correlations, weekly snapshots.
 # ============================================================

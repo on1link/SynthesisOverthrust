@@ -1,7 +1,6 @@
 -- =============================================================
--- Neural Forge — migrations/001_initial.sql
+-- SynthesisOverthrust — migrations/001_initial.sql
 -- Complete schema — all phases consolidated.
--- No ALTER TABLE statements; every column is declared inline.
 -- =============================================================
 
 -- ── Users ─────────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/components/Onboarding.tsx
+// SynthesisOverthrust — src/components/Onboarding.tsx
 // First-run wizard — 5 steps:
 // 0: Welcome splash
 // 1: Vault path setup
@@ -188,13 +188,13 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           <div style={{ textAlign: "center" }}>
             <div style={{ fontSize: 64, marginBottom: 20, animation: "nf-bounce 2s ease infinite" }}>⬡</div>
             <div style={{ fontFamily: F.display, fontSize: 38, fontWeight: 700, letterSpacing: 5, color: C.accent, marginBottom: 4 }}>
-              NEURAL FORGE
+              SynthesisOverthrust
             </div>
             <div style={{ fontFamily: F.mono, fontSize: 12, color: C.gold, letterSpacing: 4, marginBottom: 32 }}>
-              GAMMA  v0.3.0
+              ALPHA  v0.1.0
             </div>
             <div style={{ fontFamily: F.body, fontSize: 15, color: C.text2, lineHeight: 1.9, marginBottom: 36 }}>
-              Your gamified ML learning OS.<br />
+              Your gamified learning App.<br />
               Skill trees · Spaced repetition · AI tutor · Knowledge graphs.<br />
               <span style={{ color: C.accent }}>Built to outcompete distraction</span>, one commit at a time.
             </div>
@@ -224,7 +224,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               Connect Obsidian Vault
             </div>
             <div style={{ fontFamily: F.body, fontSize: 14, color: C.muted, lineHeight: 1.8, marginBottom: 28 }}>
-              Neural Forge syncs bidirectionally with your Obsidian vault — skill notes, project logs, and daily reviews are written automatically.
+              SynthesisOverthrust syncs bidirectionally with your Obsidian vault — skill notes, project logs, and daily reviews are written automatically.
               <br /><br />
               <span style={{ color: C.teal }}>Optional</span> — you can skip and configure later in Settings.
             </div>
@@ -249,7 +249,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
             )}
 
             <div style={{ fontFamily: F.body, fontSize: 12, color: C.dim, marginTop: 8 }}>
-              NF will create a <code style={{ color: C.teal }}>NeuralForge/</code> folder in your vault. Existing notes are never modified without your permission.
+              SO will create a <code style={{ color: C.teal }}>SynthesisOverthrust/</code> folder in your vault. Existing notes are never modified without your permission.
             </div>
           </div>
         )}
@@ -264,7 +264,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               Local AI Setup
             </div>
             <div style={{ fontFamily: F.body, fontSize: 14, color: C.muted, lineHeight: 1.8, marginBottom: 24 }}>
-              Neural Forge uses <span style={{ color: C.purple }}>Ollama</span> to run LLMs 100% locally — no API key, no cloud, your data stays on your machine.
+              SynthesisOverthrust uses <span style={{ color: C.purple }}>Ollama</span> to run LLMs 100% locally — no API key, no cloud, your data stays on your machine.
             </div>
 
             {/* Ollama status */}
@@ -367,7 +367,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
               YOU'RE READY
             </div>
             <div style={{ fontFamily: F.mono, fontSize: 12, color: C.muted, letterSpacing: 3, marginBottom: 28 }}>
-              NEURAL FORGE v0.3.0 GAMMA
+              SYNTHESISOVERTHRUST v0.1.0 ALPHA
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 32 }}>
               {[
@@ -415,7 +415,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
           {step === 4 && (
             <button onClick={handleComplete} disabled={launching}
               style={{ width: "100%", background: `${C.green}22`, border: `2px solid ${C.green}66`, color: C.green, padding: "16px", borderRadius: 12, cursor: "pointer", fontFamily: F.display, fontSize: 16, fontWeight: 700, letterSpacing: 3, boxShadow: `0 0 30px ${C.green}22`, opacity: launching ? 0.7 : 1, animation: launching ? "nf-pulse 0.5s ease-in-out infinite" : "none" }}>
-              {launching ? "INITIALISING…" : "⚡ LAUNCH NEURAL FORGE"}
+              {launching ? "INITIALISING…" : "⚡ LAUNCH SYNTHESISOVERTHRUST"}
             </button>
           )}
         </div>
@@ -423,7 +423,7 @@ export default function Onboarding({ onComplete }: OnboardingProps) {
 
       {/* Version stamp */}
       <div style={{ position: "absolute", bottom: 24, fontFamily: F.mono, fontSize: 9, color: C.dim, letterSpacing: 2 }}>
-        NEURAL FORGE GAMMA v0.3.0 · BUILD {new Date().getFullYear()}
+        SYNTHESISOVERTHRUST ALPHA v0.1.0 · BUILD {new Date().getFullYear()}
       </div>
 
       <style>{`

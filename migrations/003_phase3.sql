@@ -1,5 +1,5 @@
 -- =============================================================
--- Neural Forge — migrations/003_phase3.sql
+-- SynthesisOverthrust — migrations/003_phase3.sql
 -- Phase 3: Ecosystem additions.
 -- Requires 001_initial.sql and 002_phase2.sql to have run first.
 --

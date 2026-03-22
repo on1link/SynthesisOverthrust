@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/components/Settings.tsx
+// SynthesisOverthrust — src/components/Settings.tsx
 // Settings hub: Git backup, Obsidian sync, plugins, appearance.
 // ============================================================
 
@@ -119,7 +119,7 @@ function BackupTab() {
         <div style={{ display: "flex", gap: 10, marginBottom: 12, flexWrap: "wrap" }}>
           <input value={remote} onChange={e => setRemote(e.target.value)}
             style={{ flex: 1, minWidth: 200, background: C.surface2, border: `1px solid ${C.border}`, borderRadius: 7, padding: "9px 13px", color: C.text, fontFamily: F.mono, fontSize: 12, outline: "none" }}
-            placeholder="https://github.com/username/neural-forge-data.git" />
+            placeholder="https://github.com/username/synthesis-overthrust-data.git" />
           <button onClick={setRemoteUrl}
             style={btnStyle(C.teal)}>
             Set Remote
@@ -221,7 +221,7 @@ function SyncTab() {
     try {
       const path = isTauri
         ? await invoke<string>("sync_write_daily_review", { xp_gained: 120, tasks_done: 4, skills_used: ["PyTorch", "NumPy"] })
-        : "/vault/NeuralForge/DailyReviews/2026-03-08.md";
+        : "/vault/SynthesisOverthrust/DailyReviews/2026-03-08.md";
       setSyncResult({ written: 1, skipped: 0, conflicts: 0, errors: [], path });
     } finally { setWriting(false); }
   };
@@ -238,7 +238,7 @@ function SyncTab() {
 
       <SectionCard title="Bidirectional Sync" col={C.accent} icon="↔">
         <div style={{ fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 1.8, marginBottom: 16 }}>
-          Neural Forge writes structured notes to your vault automatically when you:<br />
+          SynthesisOverthrust writes structured notes to your vault automatically when you:<br />
           • Level up a skill → creates <code style={{ color: C.teal }}>Skills/SkillName.md</code><br />
           • Complete a project → creates <code style={{ color: C.teal }}>Projects/ProjectName.md</code><br />
           • End a session → creates <code style={{ color: C.teal }}>DailyReviews/YYYY-MM-DD.md</code>
@@ -262,7 +262,7 @@ function SyncTab() {
 
       <SectionCard title="Conflict Resolution" col={C.gold} icon="⚠">
         <div style={{ fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 1.8 }}>
-          If NF detects that a file has been manually edited (no <code style={{ color: C.gold }}>neural-forge-managed</code> marker), it creates a conflict copy with a timestamp suffix before overwriting. Conflict copies appear in the same folder as the original.
+          If SynthesisOverthrust detects that a file has been manually edited (no <code style={{ color: C.gold }}>synthesis-overthrust-managed</code> marker), it creates a conflict copy with a timestamp suffix before overwriting. Conflict copies appear in the same folder as the original.
         </div>
       </SectionCard>
     </div>
@@ -298,7 +298,7 @@ function PluginsTab() {
     <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
       <SectionCard title="Installed Plugins" col={C.purple} icon="🔌">
         <div style={{ fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 1.8, marginBottom: 16 }}>
-          Plugins live in <code style={{ color: C.purple }}>~/.local/share/neural-forge/plugins/</code>. Each plugin has a <code>plugin.json</code> manifest and a bundled JS entry point.
+          Plugins live in <code style={{ color: C.purple }}>~/.local/share/synthesis-overthrust/plugins/</code>. Each plugin has a <code>plugin.json</code> manifest and a bundled JS entry point.
         </div>
         {loading && <div style={{ fontFamily: F.mono, color: C.muted, animation: "nf-pulse 1s ease-in-out infinite" }}>Loading plugins…</div>}
         {!loading && plugins.length === 0 && (
@@ -333,7 +333,7 @@ function PluginsTab() {
         <div style={{ fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 1.9 }}>
           Create a folder in <code style={{ color: C.teal }}>plugins/my-plugin/</code> with:<br />
           • <code>plugin.json</code> — manifest (id, name, version, entry, hooks, permissions)<br />
-          • <code>index.js</code> — bundled JavaScript (access NF APIs via <code>window.NeuralForge</code>)<br /><br />
+          • <code>index.js</code> — bundled JavaScript (access SO APIs via <code>window.SynthesisOverthrust</code>)<br /><br />
           Available hooks: <code style={{ color: C.gold }}>on_xp_gain · on_skill_level_up · on_task_complete · on_session_start · on_session_end</code><br />
           Available APIs: <code style={{ color: C.gold }}>awardXp · getStats · registerPlugin · showToast</code>
         </div>
@@ -366,10 +366,10 @@ function AppTab() {
       </SectionCard>
       <SectionCard title="Data Location" col={C.gold} icon="📁">
         <div style={{ fontFamily: F.mono, fontSize: 12, color: C.muted, lineHeight: 2 }}>
-          <div>DB: <span style={{ color: C.gold }}>~/.local/share/neural-forge/neural_forge.db</span></div>
-          <div>FAISS: <span style={{ color: C.gold }}>~/.local/share/neural-forge/faiss.index</span></div>
-          <div>Plugins: <span style={{ color: C.gold }}>~/.local/share/neural-forge/plugins/</span></div>
-          <div>Git repo: <span style={{ color: C.gold }}>~/.local/share/neural-forge/</span></div>
+          <div>DB: <span style={{ color: C.gold }}>~/.local/share/synthesis-overthrust/synthesis_overthrust.db</span></div>
+          <div>FAISS: <span style={{ color: C.gold }}>~/.local/share/synthesis-overthrust/faiss.index</span></div>
+          <div>Plugins: <span style={{ color: C.gold }}>~/.local/share/synthesis-overthrust/plugins/</span></div>
+          <div>Git repo: <span style={{ color: C.gold }}>~/.local/share/synthesis-overthrust/</span></div>
         </div>
       </SectionCard>
       <SectionCard title="Keyboard Shortcuts" col={C.purple} icon="⌨">

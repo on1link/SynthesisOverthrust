@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/components/SpacedRepetition.tsx
+// SynthesisOverthrust — src/components/SpacedRepetition.tsx
 // Flashcard review UI — SM-2 quality buttons, streak counter,
 // session progress bar, retention stats.
 // ============================================================

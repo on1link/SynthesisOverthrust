@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge v1.0.0-beta — python_sidecar/main.py
+# SynthesisOverthrust v0.1.0-alpha — python_sidecar/main.py
 # Unified FastAPI sidecar — integrates all three phases:
 #   Phase 1: Foundation (vault, config)
 #   Phase 2: SM-2 · FAISS search · Ollama LLM · Analytics
@@ -40,7 +40,7 @@ log = structlog.get_logger()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # ── STARTUP ───────────────────────────────────────────────────────────────
-    log.info("Neural Forge sidecar starting", version="1.0.0-beta")
+    log.info("SynthesisOverthrust sidecar starting", version="0.1.0-alpha")
 
     # Initialise DB (runs Phase 2 + 3 schema migrations)
     await init_db()
@@ -78,7 +78,7 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         log.warning("Plugin load skipped", error=str(e))
 
-    log.info("Neural Forge sidecar ready", port=settings.PORT)
+    log.info("SynthesisOverthrust sidecar ready", port=settings.PORT)
     yield
 
     # ── SHUTDOWN ──────────────────────────────────────────────────────────────
@@ -89,9 +89,9 @@ async def lifespan(app: FastAPI):
 
 # ── App factory ───────────────────────────────────────────────────────────────
 app = FastAPI(
-    title       = "Neural Forge Sidecar",
-    version     = "1.0.0-beta",
-    description = "Internal API for Neural Forge desktop app",
+    title       = "SynthesisOverthrust Sidecar",
+    version     = "0.1.0-alpha",
+    description = "Internal API for SynthesisOverthrust desktop app",
     lifespan    = lifespan,
     docs_url    = "/docs" if os.getenv("NF_DEBUG") else None,
     redoc_url   = None,

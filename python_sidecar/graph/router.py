@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — graph/router.py
+# SynthesisOverthrust — graph/router.py
 # Knowledge graph API endpoints
 # ============================================================
 
@@ -76,4 +76,4 @@ async def export_graphml():
     buf = io.BytesIO()
     nx.write_graphml(G, buf)
     return Response(content=buf.getvalue(), media_type="application/xml",
-                    headers={"Content-Disposition": "attachment; filename=neural-forge-graph.graphml"})
+                    headers={"Content-Disposition": "attachment; filename=synthesis-overthrust-graph.graphml"})

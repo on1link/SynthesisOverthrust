@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src-tauri/src/commands.rs
+// SynthesisOverthrust — src-tauri/src/commands.rs
 // All #[tauri::command] handlers.
 // Updated for 002_skill_cycle.sql:
 //   - activity_log uses 'action'/'details' (001 schema columns)

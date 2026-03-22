@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — llm/router.py
+# SynthesisOverthrust — llm/router.py
 # Ollama LLM endpoints:
 #   - /chat           → conversational Q&A with context injection
 #   - /practice       → generate practice problems for a skill
@@ -333,7 +333,7 @@ Respond with valid JSON only. No preamble."""
 
 # ── System prompts ────────────────────────────────────────────────────────────
 def _system_prompt(context_type: str, skill_id: Optional[str]) -> str:
-    base = """You are Neural Forge's AI tutor — an expert in machine learning engineering,
+    base = """You are SynthesisOverthrust's AI tutor — an expert in machine learning engineering,
 data engineering, and data science. You are precise, encouraging, and pedagogically sound.
 You follow Barbara Oakley's learning principles: chunking, spaced repetition, interleaving,
 and recall over re-reading. Keep responses concise and actionable."""

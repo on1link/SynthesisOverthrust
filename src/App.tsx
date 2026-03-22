@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge v1.0.0-beta — src/App.tsx
+// NSynthesisOverthrust v0.1.0-alpha — src/App.tsx
 // Unified application shell with all Phase 1+2+3 views.
 // Tauri 2.0: uses @tauri-apps/api/core for invoke()
 // ============================================================
@@ -196,7 +196,7 @@ export default function App() {
     return (
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100vh", background: C.bg }}>
         <div style={{ textAlign: "center", color: C.accent, fontFamily: F.mono }}>
-          <div style={{ fontSize: 14, marginBottom: 20 }}>◌ Initializing Neural Forge...</div>
+          <div style={{ fontSize: 14, marginBottom: 20 }}>◌ Initializing SynthesisOverthrust...</div>
           <div style={{ fontSize: 11, color: C.text2 }}>Loading game state...</div>
         </div>
       </div>

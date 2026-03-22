@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge v1.0.0-beta — src/components/Sidebar.tsx
+// SynthesisOverthrust v0.1.0-alpha — src/components/Sidebar.tsx
 // Full navigation sidebar — all Phase 1, 2, 3 views.
 // ============================================================
 
@@ -61,8 +61,8 @@ export default function Sidebar({ currentView, onNavigate, gameState, srDue = 0 
         <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 12 }}>
           <div style={{ width: 32, height: 32, borderRadius: 8, background: `${C.accent}18`, border: `1.5px solid ${C.accent}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16, boxShadow: `0 0 12px ${C.accent}33`, flexShrink: 0 }}>⬡</div>
           <div>
-            <div style={{ fontFamily: F.display, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: C.accent, lineHeight: 1.1 }}>NEURAL</div>
-            <div style={{ fontFamily: F.display, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: C.gold, lineHeight: 1.1 }}>FORGE</div>
+            <div style={{ fontFamily: F.display, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: C.accent, lineHeight: 1.1 }}>SYNTHESIS</div>
+            <div style={{ fontFamily: F.display, fontSize: 12, fontWeight: 700, letterSpacing: 3, color: C.gold, lineHeight: 1.1 }}>OVERTHRUST</div>
           </div>
         </div>
         {user && (

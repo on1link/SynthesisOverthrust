@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/main.tsx
+// SynthesisOverthrust — src/main.tsx
 // ============================================================
 
 import React from "react";

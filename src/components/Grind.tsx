@@ -1,23 +1,30 @@
 // ============================================================
-// Neural Forge — src/components/Grind.tsx
+// SynthesisOverthrust — src/components/Grind.tsx
 // Grind Station — 7 platforms, session logger, history
 // ============================================================
 
-import React, { useState, useEffect } from "react";
-import {
-  C, F, card, glassCard, btn, dangerBtn, tag, bar, fill,
-  h1, h2, h3, row, col_, grid, mono, inp, sel,
-} from "../tokens";
+import React, { useEffect, useState } from "react";
 import type { UseGameState } from "../hooks/useGameState";
+import {
+  C, F, card,
+  col_,
+  glassCard,
+  grid,
+  h1, h2,
+  inp,
+  mono,
+  row,
+  tag
+} from "../tokens";
 
 const PLATFORMS: { id: string; label: string; url: string; icon: string; col: string; desc: string }[] = [
-  { id: "leetcode",      label: "LeetCode",       url: "https://leetcode.com",              icon: "⚡", col: C.gold,   desc: "DSA problems, interview prep" },
-  { id: "tensortonic",   label: "Tensortonic",     url: "https://tensortonic.com",           icon: "🔬", col: C.accent, desc: "ML theory deep dives" },
-  { id: "mldl",          label: "MLDL.Study",      url: "https://mldl.study",                icon: "🧠", col: C.purple, desc: "ML/DL structured courses" },
-  { id: "deepml",        label: "deep-ml.com",     url: "https://deep-ml.com",               icon: "🤖", col: C.green,  desc: "Hands-on ML coding challenges" },
-  { id: "datainterview", label: "DataInterview",   url: "https://datainterviewpro.com",      icon: "💼", col: C.orange, desc: "Data science interview Qs" },
-  { id: "mlstack",       label: "MLStack.cafe",    url: "https://mlstack.cafe",              icon: "☕", col: C.pink,   desc: "ML engineering flashcards" },
-  { id: "simulations",   label: "Simulations",     url: "#",                                 icon: "🔭", col: C.teal,   desc: "Custom ML experiments" },
+  { id: "leetcode", label: "LeetCode", url: "https://leetcode.com", icon: "⚡", col: C.gold, desc: "DSA problems, interview prep" },
+  { id: "tensortonic", label: "Tensortonic", url: "https://tensortonic.com", icon: "🔬", col: C.accent, desc: "ML theory deep dives" },
+  { id: "mldl", label: "MLDL.Study", url: "https://mldl.study", icon: "🧠", col: C.purple, desc: "ML/DL structured courses" },
+  { id: "deepml", label: "deep-ml.com", url: "https://deep-ml.com", icon: "🤖", col: C.green, desc: "Hands-on ML coding challenges" },
+  { id: "datainterview", label: "DataInterview", url: "https://datainterviewpro.com", icon: "💼", col: C.orange, desc: "Data science interview Qs" },
+  { id: "mlstack", label: "MLStack.cafe", url: "https://mlstack.cafe", icon: "☕", col: C.pink, desc: "ML engineering flashcards" },
+  { id: "simulations", label: "Simulations", url: "#", icon: "🔭", col: C.teal, desc: "Custom ML experiments" },
 ];
 
 const DIFFICULTIES = ["Easy", "Medium", "Hard"];
@@ -28,15 +35,15 @@ type Props = Pick<UseGameState, "sessions" | "loadSessions" | "logSession">;
 
 export default function Grind({ sessions, loadSessions, logSession }: Props) {
   const [activePlat, setActivePlat] = useState(PLATFORMS[0]);
-  const [topic,      setTopic]      = useState("");
-  const [diff,       setDiff]       = useState("Medium");
-  const [notes,      setNotes]      = useState("");
-  const [logging,    setLogging]    = useState(false);
+  const [topic, setTopic] = useState("");
+  const [diff, setDiff] = useState("Medium");
+  const [notes, setNotes] = useState("");
+  const [logging, setLogging] = useState(false);
 
   useEffect(() => { loadSessions(activePlat.id); }, [activePlat.id]);
 
   const platSessions = sessions[activePlat.id] ?? [];
-  const xpReward     = XP_MAP[diff] ?? 60;
+  const xpReward = XP_MAP[diff] ?? 60;
 
   const handleLog = async () => {
     if (!topic.trim()) return;
@@ -66,25 +73,25 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {PLATFORMS.map(p => {
           const active = activePlat.id === p.id;
-          const cnt    = (sessions[p.id] ?? []).length;
+          const cnt = (sessions[p.id] ?? []).length;
           return (
             <button key={p.id}
               className="nf-btn"
               onClick={() => setActivePlat(p)}
               style={{
-                padding:       "10px 14px",
-                borderRadius:  10,
-                border:        `1.5px solid ${active ? p.col : C.border}`,
-                background:    active ? `${p.col}18` : C.surface2,
-                cursor:        "pointer",
-                display:       "flex",
+                padding: "10px 14px",
+                borderRadius: 10,
+                border: `1.5px solid ${active ? p.col : C.border}`,
+                background: active ? `${p.col}18` : C.surface2,
+                cursor: "pointer",
+                display: "flex",
                 flexDirection: "column",
-                alignItems:    "center",
-                gap:           4,
-                minWidth:      90,
-                boxShadow:     active ? `0 0 18px ${p.col}33` : "none",
-                transition:    "all 0.18s ease",
-                position:      "relative",
+                alignItems: "center",
+                gap: 4,
+                minWidth: 90,
+                boxShadow: active ? `0 0 18px ${p.col}33` : "none",
+                transition: "all 0.18s ease",
+                position: "relative",
               }}>
               <span style={{ fontSize: 20 }}>{p.icon}</span>
               <span style={{ fontFamily: F.display, fontSize: 11, fontWeight: 700, color: active ? p.col : C.muted, letterSpacing: 0.5 }}>
@@ -130,8 +137,8 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
                 style={{
                   ...inp,
                   borderColor: topic ? `${activePlat.col}55` : C.border,
-                  boxShadow:   topic ? `0 0 12px ${activePlat.col}22` : "none",
-                  transition:  "all 0.2s ease",
+                  boxShadow: topic ? `0 0 12px ${activePlat.col}22` : "none",
+                  transition: "all 0.2s ease",
                 }}
                 placeholder={`e.g. Binary Tree LCA, Transformers attention…`}
                 value={topic}
@@ -152,15 +159,15 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
                       className="nf-btn"
                       onClick={() => setDiff(d)}
                       style={{
-                        flex:       1,
-                        padding:    "9px 0",
+                        flex: 1,
+                        padding: "9px 0",
                         borderRadius: 8,
-                        border:     `1.5px solid ${diff === d ? dc : C.border}`,
+                        border: `1.5px solid ${diff === d ? dc : C.border}`,
                         background: diff === d ? `${dc}22` : "transparent",
-                        color:      diff === d ? dc : C.muted,
-                        cursor:     "pointer",
+                        color: diff === d ? dc : C.muted,
+                        cursor: "pointer",
                         fontFamily: F.display,
-                        fontSize:   13,
+                        fontSize: 13,
                         fontWeight: 700,
                         letterSpacing: 0.5,
                         transition: "all 0.15s ease",
@@ -179,8 +186,8 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
               <textarea
                 style={{
                   ...inp,
-                  height:   72,
-                  resize:   "none",
+                  height: 72,
+                  resize: "none",
                   lineHeight: 1.6,
                 }}
                 placeholder="Key insight, edge case, technique used…"
@@ -208,23 +215,23 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
               onClick={handleLog}
               disabled={!topic.trim() || logging}
               style={{
-                padding:       "13px",
-                borderRadius:  9,
-                border:        `2px solid ${topic.trim() ? activePlat.col : C.border}`,
-                background:    topic.trim() ? `${activePlat.col}22` : C.surface2,
-                color:         topic.trim() ? activePlat.col : C.muted,
-                cursor:        topic.trim() ? "pointer" : "not-allowed",
-                fontFamily:    F.display,
-                fontSize:      15,
-                fontWeight:    700,
+                padding: "13px",
+                borderRadius: 9,
+                border: `2px solid ${topic.trim() ? activePlat.col : C.border}`,
+                background: topic.trim() ? `${activePlat.col}22` : C.surface2,
+                color: topic.trim() ? activePlat.col : C.muted,
+                cursor: topic.trim() ? "pointer" : "not-allowed",
+                fontFamily: F.display,
+                fontSize: 15,
+                fontWeight: 700,
                 letterSpacing: 2,
                 textTransform: "uppercase",
-                width:         "100%",
-                display:       "flex",
-                alignItems:    "center",
+                width: "100%",
+                display: "flex",
+                alignItems: "center",
                 justifyContent: "center",
-                gap:           8,
-                transition:    "all 0.18s ease",
+                gap: 8,
+                transition: "all 0.18s ease",
               }}>
               {logging ? "⏳ Logging…" : `⚡ Log Session — +${xpReward} XP`}
             </button>
@@ -240,7 +247,7 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
 
           {platSessions.length === 0 ? (
             <div style={{ textAlign: "center", padding: 40, color: C.muted, fontFamily: F.body, fontSize: 13 }}>
-              No sessions yet.<br/>
+              No sessions yet.<br />
               <span style={{ fontSize: 11, marginTop: 6, display: "block" }}>Log your first grind above!</span>
             </div>
           ) : (
@@ -251,10 +258,10 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
                   <div key={s.id}
                     className="nf-card-hover"
                     style={{
-                      padding:      "11px 14px",
+                      padding: "11px 14px",
                       borderRadius: 9,
-                      background:   C.surface2,
-                      border:       `1px solid ${C.border}`,
+                      background: C.surface2,
+                      border: `1px solid ${C.border}`,
                       "--hover-col": activePlat.col,
                     } as React.CSSProperties}>
                     <div style={{ ...row(), justifyContent: "space-between", marginBottom: 4 }}>

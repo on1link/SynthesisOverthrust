@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/components/KnowledgeGraph.tsx
+// SynthesisOverthrust — src/components/KnowledgeGraph.tsx
 // D3 force-directed knowledge graph:
 // skill nodes + vault notes + concept links.
 // Click to inspect, drag to rearrange, scroll to zoom.

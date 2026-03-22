@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — mobile/router.py
+# SynthesisOverthrust — mobile/router.py
 # Compact REST API for React Native mobile companion.
 # Auth: Bearer token (API key) in Authorization header.
 # ============================================================

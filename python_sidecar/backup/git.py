@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — backup/git.py
+# SynthesisOverthrust — backup/git.py
 # Git-based auto-backup for vault + SQLite DB snapshots.
 # Uses GitPython.
 # ============================================================
@@ -51,7 +51,7 @@ def git_commit(data_dir: str, message: Optional[str] = None) -> CommitResult:
             return CommitResult(status="nothing_to_commit", message="Nothing to commit")
 
         changed = len(repo.index.diff("HEAD")) if repo.head.is_valid() else 1
-        msg     = message or f"neural-forge auto-backup {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
+        msg     = message or f"synthesis-overthrust auto-backup {datetime.utcnow().strftime('%Y-%m-%d %H:%M')}"
         commit  = repo.index.commit(msg)
         log.info("Git commit", hash=commit.hexsha[:8], files=changed)
         return CommitResult(
@@ -118,11 +118,11 @@ async def snapshot_db(db_path: str, backup_dir: str) -> str:
     src  = Path(db_path)
     dst  = Path(backup_dir) / "snapshots"
     dst.mkdir(parents=True, exist_ok=True)
-    name = f"neural_forge_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.db"
+    name = f"synthesis_overthrust_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.db"
     await asyncio.to_thread(shutil.copy2, str(src), str(dst / name))
     log.info("DB snapshot created", file=name)
     # Keep only last 10 snapshots
-    snapshots = sorted(dst.glob("neural_forge_*.db"))
+    snapshots = sorted(dst.glob("synthesis_overthrust_*.db"))
     for old in snapshots[:-10]:
         old.unlink(missing_ok=True)
     return str(dst / name)

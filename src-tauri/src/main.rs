@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge v1.0.0-beta — src-tauri/src/main.rs
+// SynthesisOverthrust v0.1.0-alpha — src-tauri/src/main.rs
 // Tauri 2.0 application entry point.
 // Integrates Phase 1 (foundation) + Phase 2 (intelligence)
 // + Phase 3 (ecosystem) into a unified application.
@@ -38,13 +38,13 @@ pub static DB: OnceCell<SqlitePool> = OnceCell::new();
 
 // ── Tray icon setup (Tauri 2.0 API) ──────────────────────────────────────────
 fn setup_tray(app: &AppHandle) -> tauri::Result<TrayIcon> {
-    let show = MenuItem::with_id(app, "show", "Open Neural Forge", true, None::<&str>)?;
+    let show = MenuItem::with_id(app, "show", "Open SynthesisOverthrust", true, None::<&str>)?;
     let sep = tauri::menu::PredefinedMenuItem::separator(app)?;
     let quit = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
     let menu = Menu::with_items(app, &[&show, &sep, &quit])?;
 
     TrayIconBuilder::with_id("main-tray")
-        .tooltip("Neural Forge")
+        .tooltip("SynthesisOverthrust")
         .icon(app.default_window_icon().unwrap().clone())
         .menu(&menu)
         .show_menu_on_left_click(false)
@@ -94,12 +94,12 @@ fn main() {
         .with(fmt::layer().with_target(false))
         .with(
             EnvFilter::from_default_env()
-                .add_directive("neural_forge=debug".parse().unwrap())
+                .add_directive("synthesis_overthrust=debug".parse().unwrap())
                 .add_directive("tauri=info".parse().unwrap()),
         )
         .init();
 
-    info!("Neural Forge v1.0.0-beta starting…");
+    info!("SynthesisOverthrust v0.1.0-alpha starting…");
 
     // 🐛 FIX: Cambiamos `.run()` por `.build()` para poder controlar el Event Loop
     let app = tauri::Builder::default()
@@ -128,7 +128,7 @@ fn main() {
                 .expect("cannot resolve app data dir");
             std::fs::create_dir_all(&data_dir)?;
 
-            let db_path = data_dir.join("neural_forge.db");
+            let db_path = data_dir.join("synthesis_overthrust.db");
             let db_url = format!("sqlite://{}?mode=rwc", db_path.display());
             let vault_dir = data_dir.join("vault");
             std::fs::create_dir_all(&vault_dir)?;
@@ -249,7 +249,7 @@ fn main() {
             // (He omitido la lista larga aquí por brevedad, pero mantén todos tus comandos)
         ])
         .build(tauri::generate_context!())
-        .expect("Neural Forge failed to build");
+        .expect("SynthesisOverthrust failed to build");
 
     // 🐛 FIX: Interceptamos el Event Loop de Tauri para garantizar limpieza de memoria
     app.run(|app_handle, event| match event {
@@ -260,7 +260,7 @@ fn main() {
             std::thread::sleep(std::time::Duration::from_millis(150));
         }
         RunEvent::Exit => {
-            info!("Neural Forge closed cleanly. No zombie processes left behind.");
+            info!("SynthesisOverthrust closed cleanly. No zombie processes left behind.");
         }
         _ => {}
     });

@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — backup/router.py
+# SynthesisOverthrust — backup/router.py
 # Git backup + Syncthing status endpoints
 # ============================================================
 
@@ -22,13 +22,13 @@ class CommitIn(BaseModel):
 
 @router.get("/status")
 async def backup_status():
-    data_dir = settings.BACKUP_DIR if hasattr(settings, "BACKUP_DIR") else str(__import__("pathlib").Path.home() / ".local/share/neural-forge")
+    data_dir = settings.BACKUP_DIR if hasattr(settings, "BACKUP_DIR") else str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
     return git_status(data_dir)
 
 
 @router.post("/commit")
 async def backup_commit(body: CommitIn):
-    data_dir = str(__import__("pathlib").Path.home() / ".local/share/neural-forge")
+    data_dir = str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
     result   = await asyncio.to_thread(git_commit, data_dir, body.message)
     db = await get_db()
     await db.execute(
@@ -41,21 +41,21 @@ async def backup_commit(body: CommitIn):
 
 @router.post("/push")
 async def backup_push():
-    data_dir = str(__import__("pathlib").Path.home() / ".local/share/neural-forge")
+    data_dir = str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
     msg      = await asyncio.to_thread(git_push, data_dir)
     return {"result": msg}
 
 
 @router.get("/log")
 async def backup_log_endpoint(limit: int = 20):
-    data_dir = str(__import__("pathlib").Path.home() / ".local/share/neural-forge")
+    data_dir = str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
     return git_log(data_dir, limit)
 
 
 @router.post("/snapshot-db")
 async def snapshot_database():
     from config import settings
-    data_dir = str(__import__("pathlib").Path.home() / ".local/share/neural-forge")
+    data_dir = str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
     path     = await snapshot_db(settings.DB_PATH, data_dir)
     return {"snapshot": path}
 

@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — sm2/engine.py
+# SynthesisOverthrust — sm2/engine.py
 # SuperMemo 2 (SM-2) spaced repetition engine.
 # Pure Python — no external SM-2 dependency needed.
 # ============================================================

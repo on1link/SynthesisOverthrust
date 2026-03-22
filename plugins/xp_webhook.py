@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — plugins/examples/xp_webhook.py
+# SynthesisOverthrust — plugins/examples/xp_webhook.py
 # Posts XP events to Discord/Slack/custom webhook.
 # Config: { "webhook_url": "https://...", "min_xp": 100 }
 # ============================================================
@@ -12,9 +12,9 @@ class XpWebhookPlugin(BasePlugin):
     manifest = PluginManifest(
         id          = "xp-webhook",
         name        = "XP Webhook",
-        version     = "0.8.1",
+        version     = "0.0.1",
         description = "Posts level-up and big XP events to a Discord/Slack webhook.",
-        author      = "community",
+        author      = "on1link",
         hooks       = ["on_level_up", "on_xp_gain", "on_skill_levelup"],
         config_schema = {
             "webhook_url": { "type": "string", "description": "Discord/Slack webhook URL" },
@@ -24,7 +24,7 @@ class XpWebhookPlugin(BasePlugin):
 
     async def on_level_up(self, payload: dict) -> None:
         level = payload.get("level", "?")
-        await self._post(f"🎉 **Leveled up to {level}!** in Neural Forge")
+        await self._post(f"🎉 **Leveled up to {level}!** in SynthesisOverthrust")
 
     async def on_skill_levelup(self, payload: dict) -> None:
         name  = payload.get("skill_name", "?")
@@ -44,7 +44,7 @@ class XpWebhookPlugin(BasePlugin):
             return
         try:
             # Discord format
-            payload = {"content": message, "username": "Neural Forge"}
+            payload = {"content": message, "username": "SynthesisOverthrust"}
             # Slack format fallback
             if "hooks.slack.com" in url:
                 payload = {"text": message}

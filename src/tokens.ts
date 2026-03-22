@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/tokens.ts
+// SynthesisOverthrust — src/tokens.ts
 // Central design system — all CSS values, style factories,
 // and shared animation keyframes.
 // ============================================================

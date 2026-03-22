@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — sm2/router.py
+# SynthesisOverthrust — sm2/router.py
 # FastAPI routes for spaced repetition card management.
 # ============================================================
 

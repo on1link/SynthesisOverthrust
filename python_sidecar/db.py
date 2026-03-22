@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — python_sidecar/db.py
+# SynthesisOverthrust — python_sidecar/db.py
 # Async SQLite via aiosqlite. Applies all migrations in order.
 # Shared read/write with Rust via WAL mode.
 # ============================================================

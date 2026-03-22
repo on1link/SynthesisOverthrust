@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — plugins/examples/github_tracker.py
+# SynthesisOverthrust — plugins/examples/github_tracker.py
 # Fetches daily GitHub contribution count and awards XP.
 # Config: { "github_username": "yourname", "xp_per_commit": 30 }
 # ============================================================
@@ -13,9 +13,9 @@ class GithubTrackerPlugin(BasePlugin):
     manifest = PluginManifest(
         id          = "github-tracker",
         name        = "GitHub Activity",
-        version     = "1.1.0",
+        version     = "0.1.0",
         description = "Awards XP for GitHub commits. Fetches contribution graph from GitHub API.",
-        author      = "neural-forge-team",
+        author      = "on1link",
         hooks       = ["on_daily_reset", "on_task_complete"],
         config_schema = {
             "github_username": { "type": "string",  "description": "Your GitHub username" },

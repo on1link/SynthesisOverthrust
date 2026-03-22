@@ -1,9 +1,9 @@
 [package]
-name        = "neural-forge"
-version     = "1.0.0-beta"
-edition     = "2021"
-authors     = ["Neural Forge Team"]
-description = "Gamified ML learning OS — Tauri 2.0 desktop app"
+name        = "synthesis-overthrust"
+version     = "0.1.0-alpha"
+edition     = "2026"
+authors     = ["on1link"]
+description = "Gamified learning App — Tauri 2.0 desktop app"
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 [build-dependencies]

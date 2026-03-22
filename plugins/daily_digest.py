@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — plugins/examples/daily_digest.py
+# SynthesisOverthrust — plugins/examples/daily_digest.py
 # Generates a daily Obsidian note at midnight with:
 # - Tasks completed today
 # - XP earned + level progress

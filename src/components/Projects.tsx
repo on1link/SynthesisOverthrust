@@ -1,33 +1,43 @@
 // ============================================================
-// Neural Forge — src/components/Projects.tsx
+// SynthesisOverthrust — src/components/Projects.tsx
 // Mission Board — Kanban: Backlog → Active → Completed
 // ============================================================
 
 import React, { useState } from "react";
-import {
-  C, F, card, glassCard, btn, dangerBtn, tag, bar, fill,
-  h1, h2, h3, row, col_, grid, mono, inp, sel,
-} from "../tokens";
-import type { UseGameState } from "../hooks/useGameState";
 import type { Project } from "../api";
+import type { UseGameState } from "../hooks/useGameState";
+import {
+  C, F,
+  btn,
+  card,
+  col_,
+  dangerBtn,
+  glassCard,
+  grid,
+  h1, h2,
+  inp,
+  row,
+  sel,
+  tag
+} from "../tokens";
 
 const TYPES = ["Learning", "Competition", "Research", "Portfolio", "Kaggle"];
 
 const TYPE_COL: Record<string, string> = {
-  Learning:    C.accent,
+  Learning: C.accent,
   Competition: C.gold,
-  Research:    C.purple,
-  Portfolio:   C.green,
-  Kaggle:      C.orange,
+  Research: C.purple,
+  Portfolio: C.green,
+  Kaggle: C.orange,
 };
 const TYPE_ICON: Record<string, string> = {
   Learning: "📚", Competition: "🏆", Research: "🔬", Portfolio: "💼", Kaggle: "🐢",
 };
 
 const STATUS_META = [
-  { id: "backlog", label: "BACKLOG",     icon: "📋", col: C.muted  },
-  { id: "active",  label: "IN PROGRESS", icon: "⚡", col: C.accent },
-  { id: "done",    label: "COMPLETED",   icon: "✓",  col: C.green  },
+  { id: "backlog", label: "BACKLOG", icon: "📋", col: C.muted },
+  { id: "active", label: "IN PROGRESS", icon: "⚡", col: C.accent },
+  { id: "done", label: "COMPLETED", icon: "✓", col: C.green },
 ];
 
 const XP_DEFAULTS: Record<string, number> = {
@@ -38,8 +48,8 @@ type Props = Pick<UseGameState, "projects" | "createProject" | "moveProject" | "
 
 export default function Projects({ projects, createProject, moveProject, deleteProject }: Props) {
   const [showForm, setShowForm] = useState(false);
-  const [title,    setTitle]    = useState("");
-  const [ptype,    setPtype]    = useState("Learning");
+  const [title, setTitle] = useState("");
+  const [ptype, setPtype] = useState("Learning");
 
   const byStatus = (s: string) => projects.filter(p => p.status === s);
 
@@ -49,9 +59,9 @@ export default function Projects({ projects, createProject, moveProject, deleteP
     setTitle(""); setShowForm(false);
   };
 
-  const totalXp  = projects.filter(p => p.status === "done").reduce((s, p) => s + p.xp_reward, 0);
-  const activeN  = byStatus("active").length;
-  const doneN    = byStatus("done").length;
+  const totalXp = projects.filter(p => p.status === "done").reduce((s, p) => s + p.xp_reward, 0);
+  const activeN = byStatus("active").length;
+  const doneN = byStatus("done").length;
 
   return (
     <div className="nf-view" style={col_(18)}>
@@ -74,10 +84,10 @@ export default function Projects({ projects, createProject, moveProject, deleteP
       {/* Stats row */}
       <div style={grid(4, 12)}>
         {[
-          { v: projects.length, l: "Total",      col: C.muted  },
-          { v: activeN,         l: "Active",     col: C.accent },
-          { v: doneN,           l: "Completed",  col: C.green  },
-          { v: totalXp,         l: "XP Earned",  col: C.gold   },
+          { v: projects.length, l: "Total", col: C.muted },
+          { v: activeN, l: "Active", col: C.accent },
+          { v: doneN, l: "Completed", col: C.green },
+          { v: totalXp, l: "XP Earned", col: C.gold },
         ].map(({ v, l, col }) => (
           <div key={l} style={{ ...glassCard(col), textAlign: "center", padding: "14px 10px" }}>
             <div style={{ fontFamily: F.mono, fontSize: 26, color: col, fontWeight: 700, lineHeight: 1 }}>{v.toLocaleString()}</div>
@@ -194,27 +204,27 @@ export default function Projects({ projects, createProject, moveProject, deleteP
 function ProjectCard({
   project, onMove, onDelete,
 }: {
-  project:  Project;
-  onMove:   (s: string) => void;
+  project: Project;
+  onMove: (s: string) => void;
   onDelete: () => void;
 }) {
-  const col   = TYPE_COL[project.project_type] ?? C.muted;
-  const icon  = TYPE_ICON[project.project_type] ?? "📁";
+  const col = TYPE_COL[project.project_type] ?? C.muted;
+  const icon = TYPE_ICON[project.project_type] ?? "📁";
 
-  const nextStatus   = project.status === "backlog" ? "active" : project.status === "active" ? "done" : null;
-  const prevStatus   = project.status === "done" ? "active" : project.status === "active" ? "backlog" : null;
-  const nextLabel    = project.status === "backlog" ? "▶ Start" : project.status === "active" ? "✓ Complete" : null;
+  const nextStatus = project.status === "backlog" ? "active" : project.status === "active" ? "done" : null;
+  const prevStatus = project.status === "done" ? "active" : project.status === "active" ? "backlog" : null;
+  const nextLabel = project.status === "backlog" ? "▶ Start" : project.status === "active" ? "✓ Complete" : null;
 
   return (
     <div
       className="nf-card-hover"
       style={{
-        padding:      "12px 14px",
+        padding: "12px 14px",
         borderRadius: 10,
-        background:   C.surface2,
-        border:       `1px solid ${C.border}`,
+        background: C.surface2,
+        border: `1px solid ${C.border}`,
         "--hover-col": col,
-        animation:    "nf-fadein 0.18s ease",
+        animation: "nf-fadein 0.18s ease",
       } as React.CSSProperties}>
 
       {/* Type + title */}

@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — graph/builder.py
+# SynthesisOverthrust — graph/builder.py
 # Builds a knowledge graph from:
 #   1. Obsidian [[wikilinks]] between notes
 #   2. Skill tree prerequisite edges (from DB)

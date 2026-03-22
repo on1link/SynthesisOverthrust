@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — collab/router.py
+# SynthesisOverthrust — collab/router.py
 # Study room REST + WebSocket endpoints
 # WS URL: ws://localhost:7731/collab/ws/{room_id}?user_id=x&name=y
 # ============================================================

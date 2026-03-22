@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/hooks/useGameState.ts
+// SynthesisOverthrust — src/hooks/useGameState.ts
 // Central game state — loads from Tauri API, exposes actions.
 // All views consume this single hook.
 // ============================================================

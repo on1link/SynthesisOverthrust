@@ -1,8 +1,25 @@
 #!/usr/bin/env bash
 # ============================================================
-# Neural Forge v1.0.0-beta — scripts/setup.sh
+# SynthesisOverthrust v0.1.0-alpha — scripts/setup.sh
 # One-time setup: install all dependencies
 # ============================================================
+# SynthesisOverthrust - Gamified skill acquisition platform
+# Copyright (C) 2026 on1link
+# 
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+# GNU General Public License for more details.
+# 
+# You should have received a copy of the GNU General Public License
+# along with this program. If not, see <https://www.gnu.org/licenses/>.
+# ============================================================
+
 set -euo pipefail
 
 CYAN='\033[0;36m'; GOLD='\033[0;33m'; GREEN='\033[0;32m'; RED='\033[0;31m'; NC='\033[0m'
@@ -12,7 +29,7 @@ ok()    { echo -e "${GREEN}[✓]${NC} $*"; }
 warn()  { echo -e "${GOLD}[!]${NC} $*"; }
 error() { echo -e "${RED}[✗]${NC} $*"; exit 1; }
 
-info "Neural Forge v1.0.0-beta setup"
+info "SynthesisOverthrust v0.1.0-alpha setup"
 echo ""
 
 # ── Check Rust ────────────────────────────────────────────────────────────────

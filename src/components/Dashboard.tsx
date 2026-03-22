@@ -1,17 +1,17 @@
 // ============================================================
-// Neural Forge — src/components/Dashboard.tsx
+// SynthesisOverthrust — src/components/Dashboard.tsx
 // Command Center — HUD, quests, goals, path mastery, activity
 // ============================================================
 
 import React, { useState } from "react";
-import { C, F, card, glassCard, btn, dangerBtn, tag, bar, fill, label, h1, h2, h3, row, grid, col_, mono } from "../tokens";
 import type { UseGameState } from "../hooks/useGameState";
+import { C, F, bar, btn, card, col_, fill, glassCard, grid, h1, h2, mono, row, tag } from "../tokens";
 
 const XP_PER_LVL = 1000;
 const PATH_META: Record<string, { col: string; icon: string; label: string }> = {
   mle: { col: C.mle, icon: "⚡", label: "ML Engineer" },
-  de:  { col: C.de,  icon: "🗄", label: "Data Engineer" },
-  ds:  { col: C.ds,  icon: "📊", label: "Data Scientist" },
+  de: { col: C.de, icon: "🗄", label: "Data Engineer" },
+  ds: { col: C.ds, icon: "📊", label: "Data Scientist" },
 };
 
 const OAKLEY = [
@@ -40,15 +40,15 @@ export default function Dashboard({
   user, tasks, goals, activity, skillNodes,
   createTask, completeTask, deleteTask, updateGoal,
 }: Props) {
-  const [addOpen,   setAddOpen]   = useState(false);
-  const [taskText,  setTaskText]  = useState("");
-  const [taskXp,    setTaskXp]    = useState(50);
-  const [taskCat,   setTaskCat]   = useState("Focus");
+  const [addOpen, setAddOpen] = useState(false);
+  const [taskText, setTaskText] = useState("");
+  const [taskXp, setTaskXp] = useState(50);
+  const [taskCat, setTaskCat] = useState("Focus");
 
   const xpInLvl = (user?.xp ?? 0) % XP_PER_LVL;
-  const xpPct   = (xpInLvl / XP_PER_LVL) * 100;
-  const tip     = OAKLEY[new Date().getDay() % OAKLEY.length];
-  const done    = tasks.filter(t => t.done).length;
+  const xpPct = (xpInLvl / XP_PER_LVL) * 100;
+  const tip = OAKLEY[new Date().getDay() % OAKLEY.length];
+  const done = tasks.filter(t => t.done).length;
 
   const handleAddTask = async () => {
     if (!taskText.trim()) return;
@@ -63,7 +63,7 @@ export default function Dashboard({
       <div style={{ ...row(16), justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
         <div>
           <div style={{ fontFamily: F.mono, color: C.accent, fontSize: 10, letterSpacing: 4, marginBottom: 4 }}>
-            // NEURAL FORGE — COMMAND CENTER
+            // SYNTHESIS OVERTHRUST — COMMAND CENTER
           </div>
           <h1 style={h1}>Command Center</h1>
         </div>
@@ -85,7 +85,7 @@ export default function Dashboard({
           position: "absolute", inset: 0, opacity: 0.04,
           backgroundImage: `repeating-linear-gradient(0deg,${C.accent} 0,${C.accent} 1px,transparent 1px,transparent 40px),repeating-linear-gradient(90deg,${C.accent} 0,${C.accent} 1px,transparent 1px,transparent 40px)`,
           pointerEvents: "none",
-        }}/>
+        }} />
 
         <div style={row(20)}>
           {/* Avatar */}
@@ -124,7 +124,7 @@ export default function Dashboard({
             <div style={{ fontSize: 34, marginBottom: 4, animation: done === tasks.length && tasks.length > 0 ? "nf-bounce 1s ease infinite" : "none" }}>
               {done === tasks.length && tasks.length > 0 ? "🏆" : "🎯"}
             </div>
-            <div style={{ ...mono(11, C.muted) }}>{done}/{tasks.length}<br/>quests</div>
+            <div style={{ ...mono(11, C.muted) }}>{done}/{tasks.length}<br />quests</div>
           </div>
         </div>
       </div>
@@ -256,7 +256,7 @@ export default function Dashboard({
                       </span>
                       <span style={mono(11, C.muted)}>{p}%</span>
                     </div>
-                    <div style={bar}><div style={fill(p, m.col)} className="nf-bar-fill"/></div>
+                    <div style={bar}><div style={fill(p, m.col)} className="nf-bar-fill" /></div>
                   </div>
                 );
               })}
@@ -276,7 +276,7 @@ export default function Dashboard({
                     <span style={{ fontFamily: F.body, fontSize: 13, color: C.text }}>{g.text}</span>
                     <span style={mono(10, C.muted)}>{g.progress}%</span>
                   </div>
-                  <div style={bar}><div style={fill(g.progress, C.purple)} className="nf-bar-fill"/></div>
+                  <div style={bar}><div style={fill(g.progress, C.purple)} className="nf-bar-fill" /></div>
                   <div style={{ ...mono(9, C.muted), marginTop: 3 }}>Target: {g.deadline}</div>
                 </div>
               ))}

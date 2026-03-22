@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/components/Analytics.tsx
+// SynthesisOverthrust — src/components/Analytics.tsx
 // Analytics dashboard — XP trend, platform breakdown, skill
 // velocity, SR health, sleep-performance correlation
 // ============================================================

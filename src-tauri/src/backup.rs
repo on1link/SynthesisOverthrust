@@ -8,14 +8,19 @@ pub async fn maybe_auto_commit(pool: SqlitePool) -> Result<()> {
     // Wait for sidecar to be ready
     tokio::time::sleep(std::time::Duration::from_secs(10)).await;
 
-    let auto: Option<String> = sqlx::query_scalar(
-        "SELECT value FROM config WHERE key='auto_git_commit'"
-    ).fetch_optional(&pool).await.ok().flatten();
+    let auto: Option<String> =
+        sqlx::query_scalar("SELECT value FROM config WHERE key='auto_git_commit'")
+            .fetch_optional(&pool)
+            .await
+            .ok()
+            .flatten();
 
     if auto.as_deref() == Some("true") {
-        let _ = crate::sidecar::post("/backup/commit",
-            serde_json::json!({"message": "neural-forge auto-commit on startup"})
-        ).await;
+        let _ = crate::sidecar::post(
+            "/backup/commit",
+            serde_json::json!({"message": "synthesis-overthrust auto-commit on startup"}),
+        )
+        .await;
         tracing::info!("Auto git-commit triggered on startup");
     }
     Ok(())

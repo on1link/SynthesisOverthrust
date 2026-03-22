@@ -1,7 +1,7 @@
 [project]
 name        = "python_sidecar"
-version     = "1.0.0-beta"
-description = "Neural Forge Python sidecar — FastAPI intelligence layer"
+version     = "0.1.0-alpha"
+description = "SynthesisOverthrust Python sidecar — FastAPI intelligence layer"
 requires-python = ">=3.11"
 
 dependencies = [
@@ -35,7 +35,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# Extraemos FAISS para evitar colisiones de namespace
+# Extract FAISS to avoid namespace collisions 
 cpu = ["faiss-cpu>=1.8"]
 gpu = ["usearch>=2.13"]
 

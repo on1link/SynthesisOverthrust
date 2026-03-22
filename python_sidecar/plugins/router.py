@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — plugins/router.py
+# SynthesisOverthrust — plugins/router.py
 # ============================================================
 
 from __future__ import annotations

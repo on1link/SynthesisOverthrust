@@ -1,5 +1,5 @@
 -- =============================================================
--- Neural Forge — migrations/002_phase2.sql
+-- SynthesisOverthrust — migrations/002_phase2.sql
 -- Phase 2: Intelligence layer additions.
 -- Requires 001_initial.sql to have run first.
 --

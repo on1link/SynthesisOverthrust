@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "Neural Forge",
-  "version": "1.0.0-beta",
-  "identifier": "com.neuralforge.app",
+  "productName": "SynthesisOverthrust",
+  "version": "0.1.0-alpha",
+  "identifier": "com.synthesisoverthrust.app",
   "build": {
     "beforeDevCommand": "npm run dev",
     "beforeBuildCommand": "npm run build",
@@ -14,7 +14,7 @@
     "windows": [
       {
         "label": "main",
-        "title": "Neural Forge",
+        "title": "SynthesisOverthrust",
         "width": 1440,
         "height": 900,
         "minWidth": 1100,
@@ -32,7 +32,7 @@
     "trayIcon": {
       "iconPath": "icons/tray.png",
       "iconAsTemplate": true,
-      "tooltip": "Neural Forge"
+      "tooltip": "SynthesisOverthrust"
     },
     "security": {
       "csp": "default-src 'self'; connect-src 'self' http://localhost:7731 ws://localhost:7731; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:;"
@@ -52,8 +52,8 @@
       "../python_sidecar/**/*"
     ],
     "category": "Education",
-    "shortDescription": "Gamified ML skill acquisition OS",
-    "longDescription": "Neural Forge is a fullscreen desktop application for machine learning skill acquisition. Skill trees, spaced repetition, local AI tutor, knowledge graph, and collaborative study rooms.",
+    "shortDescription": "Gamified skill acquisition App",
+    "longDescription": "SynthesisOverthrust is a fullscreen desktop application for machine learning skill acquisition. Skill trees, spaced repetition, local AI tutor, knowledge graph, and collaborative study rooms.",
     "linux": {
       "deb": {
         "depends": [

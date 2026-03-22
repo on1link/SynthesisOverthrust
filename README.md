@@ -1,4 +1,4 @@
-# SynthesisOverthrust - v1.0.0-gamma
+# SynthesisOverthrust - v0.1.0-alpha
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
@@ -35,8 +35,8 @@ A fullscreen, game-like learning environment for machine learning engineers, dat
 
 ```bash
 # 1. Clone and setup
-git clone https://github.com/your-org/neural-forge
-cd neural-forge
+git clone https://github.com/on1link/SynthesisOverthrust/
+cd SynthesisOverthrust
 chmod +x scripts/setup.sh && ./scripts/setup.sh
 
 # 2. Dev mode (starts sidecar + Tauri window)
@@ -118,7 +118,7 @@ const unlisten = await listen<{ status: string }>("sidecar-status", (e) => {
 ## Architecture
 
 ```
-neural-forge/
+SynthesisOverthrust/
 ├── src-tauri/                  # Rust / Tauri 2.0 backend
 │   └── src/
 │       ├── main.rs             # App entry — all plugins registered here
@@ -173,7 +173,7 @@ neural-forge/
 │   ├── 002_phase2.sql          # SR cards, embeddings, LLM tables
 │   └── 003_phase3.sql          # Graph, rooms, plugins, backup, mobile
 │
-├── plugins/                    # Example plugins (copy to ~/.local/share/neural-forge/plugins/)
+├── plugins/                    # Example plugins (copy to ~/.local/share/synthesis-overthrust/plugins/)
 │   ├── daily_digest.py
 │   ├── xp_webhook.py
 │   └── github_tracker.py
@@ -202,7 +202,7 @@ SP (Skill Points) are spent to level up skill tree nodes (1 SP per level).
 
 ## Plugin System
 
-Drop a `.py` file into `~/.local/share/neural-forge/plugins/`:
+Drop a `.py` file into `~/.local/share/synthesis-overthrust/plugins/`:
 
 ```python
 from plugins.base import BasePlugin, PluginManifest
@@ -252,8 +252,8 @@ uv run pytest tests/test_phase3.py -v   # Phase 3 ecosystem
 | `NF_EMBED_MODEL` | `all-MiniLM-L6-v2` | Embedding model |
 | `NF_PORT` | `7731` | Sidecar HTTP port |
 | `NF_DEBUG` | `false` | Enable `/docs` endpoint |
-| `NF_DATA_DIR` | `~/.local/share/neural-forge` | DB + index dir |
-| `NF_PLUGIN_DIR` | `~/.local/share/neural-forge/plugins` | Plugin directory |
+| `NF_DATA_DIR` | `~/.local/share/synthesis-overthrust` | DB + index dir |
+| `NF_PLUGIN_DIR` | `~/.local/share/synthesis-overthrust/plugins` | Plugin directory |
 
 ---
 
@@ -278,7 +278,7 @@ Artifacts appear in `src-tauri/target/release/bundle/`.
 
 Copyright (C) 2026 on1link
 
-NeuralForge is free software licensed under the
+SynthesisOverthrust is free software licensed under the
 [GNU General Public License v3.0](LICENSE).
 
 You are free to use, modify, and distribute this project, but any

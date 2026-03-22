@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — sync/watcher.py
+# SynthesisOverthrust — sync/watcher.py
 # Bidirectional Obsidian sync:
 #   - Watches vault directory for file changes (watchdog)
 #   - On create/modify: update vault_index + trigger re-embed

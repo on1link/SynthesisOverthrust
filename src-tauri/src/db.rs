@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src-tauri/src/db.rs
+// SynthesisOverthrust — src-tauri/src/db.rs
 // SQLite pool init, WAL config, migrations 001–003, skill seed.
 // Tauri 2.0 — no tauri::api::path; paths resolved via app.path().
 // ============================================================

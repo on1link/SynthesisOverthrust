@@ -1,6 +1,6 @@
 # ============================================================
-# Neural Forge — plugins/base.py
-# Base class and manifest for all Neural Forge plugins.
+# SynthesisOverthrust — plugins/base.py
+# Base class and manifest for all SynthesisOverthrust plugins.
 # ============================================================
 
 from __future__ import annotations
@@ -21,7 +21,7 @@ class PluginManifest:
 
 class BasePlugin:
     """
-    Base class for all Neural Forge plugins.
+    Base class for all SynthesisOverthrust plugins.
     Override hook methods you care about.
     """
     manifest: PluginManifest

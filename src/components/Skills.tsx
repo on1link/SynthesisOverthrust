@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src/components/Skills.tsx
+// SynthesisOverthrust — src/components/Skills.tsx
 // Ragnarok Online–style skill tree, updated for 002_skill_cycle:
 //   - Levels 0–5 (mastery-driven, not SP-only)
 //   - Level key: "node_id::path_id"

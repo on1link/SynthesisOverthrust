@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge v1.0.0-beta — src/api.ts
+// NSynthesisOverthrust v0.1.0-alpha — src/api.ts
 // Typed wrappers for ALL Tauri 2.0 IPC commands.
 // Updated for 002_skill_cycle.sql:
 //   - User: 'name' column (001), active_paths/daily_xp_goal (002)

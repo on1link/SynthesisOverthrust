@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — plugins/loader.py
+# SynthesisOverthrust — plugins/loader.py
 # Discovers, loads, and dispatches hooks to all enabled plugins.
 # ============================================================
 
@@ -18,7 +18,7 @@ from .base import BasePlugin, PluginManifest
 log = structlog.get_logger()
 
 _plugins: Dict[str, BasePlugin] = {}
-_PLUGIN_DIR = Path.home() / ".local/share/neural-forge/plugins"
+_PLUGIN_DIR = Path.home() / ".local/share/synthesis-overthrust/plugins"
 
 
 async def load_all_plugins() -> None:

@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — tests/test_phase3.py
+# SynthesisOverthrust — tests/test_phase3.py
 # Phase 3 unit tests: graph, plugins, backup
 # Run: uv run pytest tests/test_phase3.py -v
 # ============================================================

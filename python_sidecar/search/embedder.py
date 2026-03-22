@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — search/embedder.py
+# SynthesisOverthrust — search/embedder.py
 # Sentence-transformers embedding model — singleton.
 # Uses all-MiniLM-L6-v2 (80MB, fast, good quality).
 # For higher quality use all-mpnet-base-v2 (420MB).

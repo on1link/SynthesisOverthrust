@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — collab/rooms.py
+# SynthesisOverthrust — collab/rooms.py
 # WebSocket study room manager.
 # Rooms are in-memory; messages also persisted to DB.
 # Up to 8 users per room on LAN.

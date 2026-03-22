@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — tests/test_sm2.py
+# SynthesisOverthrust — tests/test_sm2.py
 # Run: uv run pytest tests/ -v
 # ============================================================
 

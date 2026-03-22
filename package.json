@@ -1,6 +1,6 @@
 {
-  "name": "neural-forge",
-  "version": "1.0.0-beta",
+  "name": "synthesis-overthrust",
+  "version": "0.1.0-alpha",
   "private": true,
   "type": "module",
   "scripts": {
