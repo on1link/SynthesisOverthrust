@@ -2,7 +2,7 @@
 // NSynthesisOverthrust v0.1.0-alpha — src/api.ts
 // Typed wrappers for ALL Tauri 2.0 IPC commands.
 // Updated for 002_skill_cycle.sql:
-//   - User: 'name' column (001), active_paths/daily_xp_goal (002)
+//   - User: 'name' column, daily_xp_goal, timezone, onboarding_done
 //   - SkillNode: canvas_x/canvas_y/prereqs/shared (001 columns)
 //   - Levels: keyed "node_id::path_id", mastery-driven 0–5
 //   - Tasks: node_id/subtopic_id (no skill_node_id)
@@ -26,58 +26,58 @@ export const api = {
   // ── Skills — mastery-driven levels ───────────────────────────────────────
   getSkillLevels: () => invoke<SkillData>("get_skill_levels"),
   /** Spend 1 SP to boost all subtopics of node_id by +15 mastery. */
-  levelUpSkill: (node_id: string, path_id: string) => invoke<LevelUpResult>("level_up_skill", { node_id, path_id }),
+  levelUpSkill: (nodeId: string, pathId: string) => invoke<LevelUpResult>("level_up_skill", { nodeId, pathId }),
 
   // ── Subtopics ─────────────────────────────────────────────────────────────
-  getSubtopics: (node_id: string, path_id: string) => invoke<Subtopic[]>("get_subtopics", { node_id, path_id }),
-  updateSubtopicMastery: (subtopic_id: string, path_id: string, delta: number) => invoke<MasteryUpdate>("update_subtopic_mastery", { subtopic_id, path_id, delta }),
+  getSubtopics: (nodeId: string, pathId: string) => invoke<Subtopic[]>("get_subtopics", { nodeId, pathId }),
+  updateSubtopicMastery: (subtopicId: string, pathId: string, delta: number) => invoke<MasteryUpdate>("update_subtopic_mastery", { subtopicId, pathId, delta }),
 
   // ── Practice problems ─────────────────────────────────────────────────────
-  listPracticeProblems: (subtopic_id: string, path_id: string, difficulty?: string, limit?: number) => invoke<PracticeProblem[]>("list_practice_problems", { subtopic_id, path_id, difficulty, limit }),
-  submitPracticeAttempt: (args: PracticeAttemptArgs) => invoke<PracticeAttemptResult>("submit_practice_attempt", args),
+  // listPracticeProblems: (subtopic_id: string, path_id: string, difficulty?: string, limit?: number) => invoke<PracticeProblem[]>("list_practice_problems", { subtopic_id, path_id, difficulty, limit }),
+  // submitPracticeAttempt: (args: PracticeAttemptArgs) => invoke<PracticeAttemptResult>("submit_practice_attempt", args),
 
   // ── Learning resources ────────────────────────────────────────────────────
-  listResources: (node_id: string, path_id: string) => invoke<LearningResource[]>("list_resources", { node_id, path_id }),
-  updateResourceProgress: (resource_id: string, pct_complete: number) => invoke<void>("update_resource_progress", { resource_id, pct_complete }),
+  // listResources: (node_id: string, path_id: string) => invoke<LearningResource[]>("list_resources", { node_id, path_id }),
+  // updateResourceProgress: (resource_id: string, pct_complete: number) => invoke<void>("update_resource_progress", { resource_id, pct_complete }),
 
   // ── Focus sessions ────────────────────────────────────────────────────────
-  logFocusSession: (args: FocusSessionArgs) => invoke<FocusResult>("log_focus_session", args),
+  // logFocusSession: (args: FocusSessionArgs) => invoke<FocusResult>("log_focus_session", args),
 
   // ── Node unlocks ──────────────────────────────────────────────────────────
-  checkNodeUnlock: (node_id: string, path_id: string) => invoke<UnlockResult>("check_node_unlock", { node_id, path_id }),
-  getUnlockedNodes: (path_id?: string) => invoke<NodeUnlock[]>("get_unlocked_nodes", { path_id }),
+  checkNodeUnlock: (nodeId: string, pathId: string) => invoke<UnlockResult>("check_node_unlock", { nodeId, pathId }),
+  getUnlockedNodes: (pathId?: string) => invoke<NodeUnlock[]>("get_unlocked_nodes", { pathId }),
 
   // ── Milestones ────────────────────────────────────────────────────────────
-  getMilestones: (path_id?: string) => invoke<Milestone[]>("get_milestones", { path_id }),
+  getMilestones: (pathId?: string) => invoke<Milestone[]>("get_milestones", { pathId }),
 
   // ── Notifications ─────────────────────────────────────────────────────────
-  listNotifications: (unread_only?: boolean) => invoke<Notification[]>("list_notifications", { unread_only }),
+  listNotifications: (unreadOnly?: boolean) => invoke<Notification[]>("list_notifications", { unreadOnly }),
   markNotificationRead: (id: string) => invoke<void>("mark_notification_read", { id }),
   markAllNotificationsRead: () => invoke<number>("mark_all_notifications_read"),
 
   // ── Tasks (002: node_id/subtopic_id) ──────────────────────────────────────
   listTasks: () => invoke<Task[]>("list_tasks"),
-  createTask: (args: CreateTaskArgs) => invoke<{ id: string }>("create_task", args),
-  completeTask: (task_id: string) => invoke<XpResult>("complete_task", { task_id }),
-  deleteTask: (task_id: string) => invoke<void>("delete_task", { task_id }),
+  createTask: (args: CreateTaskArgs) => invoke<{ id: string }>("create_task", { ...args } as Record<string, unknown>),
+  completeTask: (taskId: string) => invoke<XpResult>("complete_task", { taskId }),
+  deleteTask: (taskId: string) => invoke<void>("delete_task", { taskId }),
 
   // ── Goals (002: 'target' field) ───────────────────────────────────────────
   listGoals: () => invoke<Goal[]>("list_goals"),
-  createGoal: (args: CreateGoalArgs) => invoke<{ id: string }>("create_goal", args),
-  updateGoalProgress: (goal_id: string, progress: number) => invoke<GoalProgress>("update_goal_progress", { goal_id, progress }),
+  createGoal: (args: CreateGoalArgs) => invoke<{ id: string }>("create_goal", { ...args } as Record<string, unknown>),
+  updateGoalProgress: (goalId: string, progress: number) => invoke<GoalProgress>("update_goal_progress", { goalId, progress }),
 
   // ── Grind (002: path_id/subtopic_id/difficulty) ───────────────────────────
-  logGrindSession: (args: GrindArgs) => invoke<GrindResult>("log_grind_session", args),
+  logGrindSession: (args: GrindArgs) => invoke<GrindResult>("log_grind_session", { ...args } as Record<string, unknown>),
   listGrindSessions: () => invoke<GrindSession[]>("list_grind_sessions"),
 
   // ── Projects ──────────────────────────────────────────────────────────────
   listProjects: () => invoke<Project[]>("list_projects"),
-  createProject: (args: ProjectArgs) => invoke<{ id: string }>("create_project", args),
-  moveProject: (project_id: string, status: string) => invoke<void>("move_project", { project_id, status }),
-  deleteProject: (project_id: string) => invoke<void>("delete_project", { project_id }),
+  createProject: (args: ProjectArgs) => invoke<{ id: string }>("create_project", { ...args } as Record<string, unknown>),
+  moveProject: (projectId: string, status: string) => invoke<void>("move_project", { projectId, status }),
+  deleteProject: (projectId: string) => invoke<void>("delete_project", { projectId }),
 
   // ── Vitals ────────────────────────────────────────────────────────────────
-  logSleep: (args: SleepArgs) => invoke<SleepResult>("log_sleep", args),
+  logSleep: (args: SleepArgs) => invoke<SleepResult>("log_sleep", { ...args } as Record<string, unknown>),
   listSleepLogs: () => invoke<SleepLog[]>("list_sleep_logs"),
   listActivity: (limit?: number) => invoke<Activity[]>("list_activity", { limit }),
 
@@ -91,77 +91,82 @@ export const api = {
 
 
   // ── Assessments ─────────────────────────────────────────────────────────────
-  getAssessment: (node_id: string, path_id: string, level_target: number) =>
-    invoke<Assessment>("get_assessment", { node_id, path_id, level_target }),
+  //getAssessment: (node_id: string, path_id: string, level_target: number) =>
+  //  invoke<Assessment>("get_assessment", { node_id, path_id, level_target }),
 
-  submitAssessment: (args: AssessmentAttemptArgs) =>
-    invoke<AssessmentResult>("submit_assessment", args),
+  //submitAssessment: (args: AssessmentAttemptArgs) =>
+  //  invoke<AssessmentResult>("submit_assessment", args),
 
-  listAssessmentHistory: (node_id: string, path_id: string) =>
-    invoke<AssessmentAttempt[]>("list_assessment_history", { node_id, path_id }),
+  //listAssessmentHistory: (node_id: string, path_id: string) =>
+  // invoke<AssessmentAttempt[]>("list_assessment_history", { node_id, path_id }),
 
   // ── Phase 2 — Sidecar intelligence ───────────────────────────────────────
-  srGetDue: (limit?: number) => invoke<SrCard[]>("sr_get_due", { limit }),
-  srGetAll: () => invoke<SrCard[]>("sr_get_all"),
-  srCreateCard: (args: SrCardArgs) => invoke<SrCard>("sr_create_card", args),
-  srSubmitReview: (card_id: string, quality: number) => invoke<SrReviewResult>("sr_submit_review", { card_id, quality }),
-  srGetStats: () => invoke<SrStats>("sr_get_stats"),
+  // srGetDue: (limit?: number) => invoke<SrCard[]>("sr_get_due", { limit }),
+  // srGetAll: () => invoke<SrCard[]>("sr_get_all"),
+  // srCreateCard: (args: SrCardArgs) => invoke<SrCard>("sr_create_card", args),
+  // srSubmitReview: (card_id: string, quality: number) => invoke<SrReviewResult>("sr_submit_review", { card_id, quality }),
+  // srGetStats: () => invoke<SrStats>("sr_get_stats"),
 
-  searchVault: (query: string, top_k?: number) => invoke<SearchResult[]>("search_vault", { query, top_k }),
-  searchRelated: (skill_id: string) => invoke<SearchResult[]>("search_related", { skill_id }),
-  searchReindex: () => invoke<void>("search_reindex"),
-  searchStats: () => invoke<SearchStats>("search_stats"),
+  // searchVault: (query: string, top_k?: number) => invoke<SearchResult[]>("search_vault", { query, top_k }),
+  // searchRelated: (skill_id: string) => invoke<SearchResult[]>("search_related", { skill_id }),
+  // searchReindex: () => invoke<void>("search_reindex"),
+  // searchStats: () => invoke<SearchStats>("search_stats"),
 
-  llmChat: (messages: ChatMsg[], model?: string, vault_context?: boolean) => invoke<LlmResponse>("llm_chat", { messages, model, vault_context }),
-  llmPractice: (skill_id: string, difficulty?: string) => invoke<LlmPracticeResult>("llm_practice", { skill_id, difficulty }),
-  llmExplain: (concept: string, context?: string) => invoke<string>("llm_explain", { concept, context }),
-  llmIngestPaper: (file_path: string, write_to_vault?: boolean) => invoke<PaperDigest>("llm_ingest_paper", { file_path, write_to_vault }),
-  llmListModels: () => invoke<string[]>("llm_list_models"),
+  // llmChat: (messages: ChatMsg[], model?: string, vault_context?: boolean) => invoke<LlmResponse>("llm_chat", { messages, model, vault_context }),
+  // llmPractice: (skill_id: string, difficulty?: string) => invoke<LlmPracticeResult>("llm_practice", { skill_id, difficulty }),
+  // llmExplain: (concept: string, context?: string) => invoke<string>("llm_explain", { concept, context }),
+  // llmIngestPaper: (file_path: string, write_to_vault?: boolean) => invoke<PaperDigest>("llm_ingest_paper", { file_path, write_to_vault }),
+  // llmListModels: () => invoke<string[]>("llm_list_models"),
 
-  analyticsOverview: () => invoke<AnalyticsOverview>("analytics_overview"),
-  analyticsSkillVelocity: () => invoke<SkillVelocity[]>("analytics_skill_velocity"),
-  analyticsSleepCorrelation: () => invoke<SleepCorrelation>("analytics_sleep_correlation"),
-  analyticsWeeklySnapshot: () => invoke<WeeklySnapshot>("analytics_weekly_snapshot"),
+  // analyticsOverview: () => invoke<AnalyticsOverview>("analytics_overview"),
+  // analyticsSkillVelocity: () => invoke<SkillVelocity[]>("analytics_skill_velocity"),
+  // analyticsSleepCorrelation: () => invoke<SleepCorrelation>("analytics_sleep_correlation"),
+  // analyticsWeeklySnapshot: () => invoke<WeeklySnapshot>("analytics_weekly_snapshot"),
 
   sidecarStatus: () => invoke<{ alive: boolean }>("sidecar_status"),
   sidecarRestart: () => invoke<void>("sidecar_restart"),
 
   // ── Phase 3 — Ecosystem ───────────────────────────────────────────────────
+  // 
+
+
+
+
   backupCommit: (message?: string) => invoke<BackupResult>("backup_commit", { message }),
-  backupPush: () => invoke<void>("backup_push"),
-  backupSetRemote: (url: string) => invoke<void>("backup_set_remote", { url }),
-  backupLog: () => invoke<BackupLog[]>("backup_log"),
-  backupStatus: () => invoke<GitStatus>("backup_status"),
-  backupSnapshotDb: () => invoke<{ snapshot: string }>("backup_snapshot_db"),
-
-  syncStatus: () => invoke<SyncStatus>("sync_status"),
-  syncWriteNote: (path: string, content: string, force?: boolean) => invoke<void>("sync_write_note", { path, content, force }),
-  syncConflicts: () => invoke<SyncConflict[]>("sync_conflicts"),
-  syncResolve: (note_path: string, resolution: string) => invoke<void>("sync_resolve", { note_path, resolution }),
-  syncReindexVault: () => invoke<{ reindexed: number }>("sync_reindex_vault"),
-
-  graphData: () => invoke<GraphData>("graph_data"),
-  graphStats: () => invoke<GraphStats>("graph_stats"),
-  graphNeighbours: (node_id: string, depth?: number) => invoke<GraphData>("graph_neighbours", { node_id, depth }),
-  graphRebuild: () => invoke<void>("graph_rebuild"),
-  graphFindPath: (src: string, dst: string) => invoke<{ path: string[] }>("graph_find_path", { src, dst }),
-
-  collabListRooms: () => invoke<Room[]>("collab_list_rooms"),
-  collabCreateRoom: (name: string, topic?: string, room_id?: string) => invoke<Room>("collab_create_room", { name, topic, room_id }),
-  collabDeleteRoom: (room_id: string) => invoke<void>("collab_delete_room", { room_id }),
-  collabRoomMessages: (room_id: string) => invoke<RoomMessage[]>("collab_room_messages", { room_id }),
-
-  pluginsList: () => invoke<Plugin[]>("plugins_list"),
-  pluginsToggle: (plugin_id: string, enabled: boolean) => invoke<void>("plugins_toggle", { plugin_id, enabled }),
-  pluginsFireHook: (hook: string, payload?: object) => invoke<void>("plugins_fire_hook", { hook, payload }),
-  pluginsGetConfig: (plugin_id: string) => invoke<object>("plugins_get_config", { plugin_id }),
-  pluginsSetConfig: (plugin_id: string, config: object) => invoke<void>("plugins_set_config", { plugin_id, config }),
-  pluginsEvents: () => invoke<PluginEvent[]>("plugins_events"),
-
+  //   backupPush: () => invoke<void>("backup_push"),
+  //   backupSetRemote: (url: string) => invoke<void>("backup_set_remote", { url }),
+  //   backupLog: () => invoke<BackupLog[]>("backup_log"),
+  //   backupStatus: () => invoke<GitStatus>("backup_status"),
+  //   backupSnapshotDb: () => invoke<{ snapshot: string }>("backup_snapshot_db"),
+  // 
+  //   syncStatus: () => invoke<SyncStatus>("sync_status"),
+  //   syncWriteNote: (path: string, content: string, force?: boolean) => invoke<void>("sync_write_note", { path, content, force }),
+  //   syncConflicts: () => invoke<SyncConflict[]>("sync_conflicts"),
+  //   syncResolve: (note_path: string, resolution: string) => invoke<void>("sync_resolve", { note_path, resolution }),
+  //   syncReindexVault: () => invoke<{ reindexed: number }>("sync_reindex_vault"),
+  // 
+  //   graphData: () => invoke<GraphData>("graph_data"),
+  //   graphStats: () => invoke<GraphStats>("graph_stats"),
+  //   graphNeighbours: (node_id: string, depth?: number) => invoke<GraphData>("graph_neighbours", { node_id, depth }),
+  //   graphRebuild: () => invoke<void>("graph_rebuild"),
+  //   graphFindPath: (src: string, dst: string) => invoke<{ path: string[] }>("graph_find_path", { src, dst }),
+  // 
+  //   collabListRooms: () => invoke<Room[]>("collab_list_rooms"),
+  //   collabCreateRoom: (name: string, topic?: string, room_id?: string) => invoke<Room>("collab_create_room", { name, topic, room_id }),
+  //   collabDeleteRoom: (room_id: string) => invoke<void>("collab_delete_room", { room_id }),
+  //   collabRoomMessages: (room_id: string) => invoke<RoomMessage[]>("collab_room_messages", { room_id }),
+  // 
+  //   pluginsList: () => invoke<Plugin[]>("plugins_list"),
+  //   pluginsToggle: (plugin_id: string, enabled: boolean) => invoke<void>("plugins_toggle", { plugin_id, enabled }),
+  //   pluginsFireHook: (hook: string, payload?: object) => invoke<void>("plugins_fire_hook", { hook, payload }),
+  //   pluginsGetConfig: (plugin_id: string) => invoke<object>("plugins_get_config", { plugin_id }),
+  //   pluginsSetConfig: (plugin_id: string, config: object) => invoke<void>("plugins_set_config", { plugin_id, config }),
+  //   pluginsEvents: () => invoke<PluginEvent[]>("plugins_events"),
+  // 
   mobileGenerateKey: (label?: string) => invoke<{ key: string }>("mobile_generate_key", { label }),
   mobileListKeys: () => invoke<MobileKey[]>("mobile_list_keys"),
-  mobileRevokeKey: (key_id: string) => invoke<void>("mobile_revoke_key", { key_id }),
-  syntthingStatus: (api_key?: string) => invoke<object>("syncthing_status", { api_key }),
+  mobileRevokeKey: (keyId: string) => invoke<void>("mobile_revoke_key", { keyId }),
+  syntthingStatus: (apiKey?: string) => invoke<object>("syncthing_status", { apiKey }),
 };
 
 
@@ -172,15 +177,14 @@ export const api = {
 // ── User ──────────────────────────────────────────────────────────────────────
 export interface User {
   id: string;
-  name: string;    // Maps to 'username' in DB?
+  name: string;
   xp: number;
   level: number;
   sp: number;
   streak: number;
-  active_paths: string;
   daily_xp_goal: number;
-  timezone: string;         // Missing
-  onboarding_done: boolean; // Missing (DB uses 0/1 INTEGER)
+  timezone: string;
+  onboarding_done: boolean;
 }
 
 // ── Skills ────────────────────────────────────────────────────────────────────
@@ -188,18 +192,37 @@ export interface SkillData {
   /** Key: "node_id::path_id" → mastery-driven level data */
   levels: Record<string, NodeLevel>;
   nodes: SkillNode[];
+  roles: Role[];
+  difficulties: Difficulty[];
+}
+
+export interface Role {
+  id: string;
+  name: string;
+  color: string;
+  bg_color: string;
+  bg_alpha: string;
+  sort_order: number;
+}
+
+export interface Difficulty {
+  id: string;
+  label: string;
+  short_label: string;
+  sort_order: number;
 }
 
 export interface SkillNode {
   id: string;
-  path_id: string;
+  path_id: string;       // role_id this node instance belongs to
   name: string;
   icon: string;
   description: string;
-  canvas_x: number;  // 001: canvas_x
-  canvas_y: number;  // 001: canvas_y
-  prereqs: string;  // JSON array
-  shared: string;  // JSON array of path ids
+  difficulty_id: string;
+  prereqs: string;        // JSON array of skill ids
+  shared: string;         // JSON array of role ids
+  topic_count: number;    // number of topics (= max level display)
+  item_count: number;     // total checklist items
 }
 
 export interface NodeLevel {
@@ -476,9 +499,9 @@ export interface SyncStatus { indexed_notes: number; pending_conflicts: number; 
 export interface SyncConflict { id: string; note_path: string; local_hash: string; remote_hash: string; resolution: string; diff_preview?: string; }
 
 // ── Arg types ─────────────────────────────────────────────────────────────────
-export interface CreateTaskArgs { title: string; description?: string; xp_reward?: number; due_date?: string; node_id?: string; subtopic_id?: string; path_id?: string; }
-export interface CreateGoalArgs { title: string; description?: string; goal_type?: string; target: number; target_date?: string; node_id?: string; path_id?: string; }
-export interface GrindArgs { platform: string; problems_solved: number; duration_mins: number; difficulty?: string; node_id?: string; path_id?: string; subtopic_id?: string; notes?: string; }
-export interface ProjectArgs { title: string; description?: string; repo_url?: string; }
+export interface CreateTaskArgs { title: string; description?: string; xpReward?: number; dueDate?: string; nodeId?: string; subtopicId?: string; pathId?: string; }
+export interface CreateGoalArgs { title: string; description?: string; goalType?: string; target: number; targetDate?: string; nodeId?: string; pathId?: string; }
+export interface GrindArgs { platform: string; problemsSolved: number; durationMins: number; difficulty?: string; nodeId?: string; pathId?: string; subtopicId?: string; notes?: string; }
+export interface ProjectArgs { title: string; description?: string; repoUrl?: string; }
 export interface SleepArgs { hours: number; quality: number; energy: number; notes?: string; }
-export interface SrCardArgs { node_id: string; path_id: string; subtopic_id?: string; front: string; back: string; }
+export interface SrCardArgs { nodeId: string; pathId: string; subtopicId?: string; front: string; back: string; }
