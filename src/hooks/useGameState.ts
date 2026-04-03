@@ -4,9 +4,10 @@
 // All views consume this single hook.
 // ============================================================
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type {
   Goal, GrindSession, Project,
+  SkillData,
   SleepLog,
   Task,
   User,
@@ -18,7 +19,6 @@ const api = apiObj as any;
 
 // Types for missing API exports
 type ActivityEntry = any;
-type SkillNodeView = any;
 
 // ── Toast system ──────────────────────────────────────────────────────────────
 export type ToastType = "xp" | "levelup" | "skill" | "warn" | "info";
@@ -38,9 +38,8 @@ export interface GameState {
   sleepLogs: SleepLog[];
   activity: ActivityEntry[];
   vaultNotes: VaultNote[];
-  skillNodes: Record<string, SkillNodeView[]>; // keyed by path id
-  // grind sessions keyed by platform
-  sessions: Record<string, GrindSession[]>;
+  skillData: SkillData | null;
+  sessions: GrindSession[];
   loading: boolean;
   toasts: Toast[];
 }
@@ -51,9 +50,12 @@ export interface UseGameState extends GameState {
   pushToast: (msg: string, type?: ToastType) => void;
   // user
   refreshUser: () => Promise<void>;
-  // skills
+  // skills — new direct access
+  refreshSkills: () => Promise<void>;
+  levelUpSkill: (nodeId: string, pathId: string) => Promise<void>;
+  // skills — backward compat for Dashboard / legacy
+  skillNodes: Record<string, SkillData>;
   loadSkillPath: (path: string) => Promise<void>;
-  levelUpSkill: (path: string, nodeId: string) => Promise<void>;
   // tasks
   createTask: (text: string, xp: number, cat: string) => Promise<void>;
   completeTask: (id: string) => Promise<void>;
@@ -86,8 +88,8 @@ export function useGameState(): UseGameState {
   const [sleepLogs, setSleepLogs] = useState<SleepLog[]>([]);
   const [activity, setActivity] = useState<ActivityEntry[]>([]);
   const [vaultNotes, setVaultNotes] = useState<VaultNote[]>([]);
-  const [skillNodes, setSkillNodes] = useState<Record<string, SkillNodeView[]>>({});
-  const [sessions, setSessions] = useState<Record<string, GrindSession[]>>({});
+  const [skillData, setSkillData] = useState<SkillData | null>(null);
+  const [sessions, setSessions] = useState<GrindSession[]>([]);
   const [loading, setLoading] = useState(true);
   const [toasts, setToasts] = useState<Toast[]>([]);
 
@@ -121,11 +123,11 @@ export function useGameState(): UseGameState {
     try { setActivity(await api.listActivity()); } catch { }
   }, []);
 
-  // Initial load
+  // Initial load — each call is independent so one failure doesn't block the rest
   useEffect(() => {
     (async () => {
       try {
-        const [u, t, g, p, sl, ac, vn] = await Promise.all([
+        const results = await Promise.allSettled([
           api.getUser(),
           api.listTasks(),
           api.listGoals(),
@@ -133,21 +135,28 @@ export function useGameState(): UseGameState {
           api.listSleepLogs(),
           api.listActivity(),
           api.listVaultNotes(),
+          api.getSkillLevels(),
+          api.updateStreak(),
         ]);
-        setUser(u);
-        setTasks(t);
-        setGoals(g);
-        setProjects(p);
-        setSleepLogs(sl);
-        setActivity(ac);
-        setVaultNotes(vn);
 
-        // Preload MLE skill tree
-        const mleNodes = await api.getSkillLevels("mle");
-        setSkillNodes({ mle: mleNodes });
+        const val = <T,>(r: PromiseSettledResult<T>, fallback: T): T =>
+          r.status === "fulfilled" ? r.value : fallback;
 
-        // Update streak
-        await api.updateStreak();
+        setUser(val(results[0] as PromiseSettledResult<User>, null as any));
+        setTasks(val(results[1] as PromiseSettledResult<Task[]>, []));
+        setGoals(val(results[2] as PromiseSettledResult<Goal[]>, []));
+        setProjects(val(results[3] as PromiseSettledResult<Project[]>, []));
+        setSleepLogs(val(results[4] as PromiseSettledResult<SleepLog[]>, []));
+        setActivity(val(results[5] as PromiseSettledResult<ActivityEntry[]>, []));
+        setVaultNotes(val(results[6] as PromiseSettledResult<VaultNote[]>, []));
+        setSkillData(val(results[7] as PromiseSettledResult<SkillData>, null as any));
+
+        // Log any failures for debugging
+        results.forEach((r, i) => {
+          if (r.status === "rejected") {
+            console.warn(`Initial load [${i}] failed:`, r.reason);
+          }
+        });
       } catch (e) {
         console.warn("API not available (dev mode without Tauri):", e);
       } finally {
@@ -165,27 +174,20 @@ export function useGameState(): UseGameState {
   }, []);
 
   // ── Skill actions ──────────────────────────────────────────────────────────
-  const loadSkillPath = useCallback(async (path: string) => {
-    if (skillNodes[path]) return;
+  const refreshSkills = useCallback(async () => {
     try {
-      const data: any = await (api as any).getSkillLevels(path);
-
-      console.log("RAW PAYLOAD FROM RUST:", data);
-
-      const nodes = Array.isArray(data) ? data : (data?.nodes || []);
-      setSkillNodes(p => ({ ...p, [path]: nodes }));
-
+      const sd = await api.getSkillLevels();
+      setSkillData(sd);
     } catch (e) {
-      console.error("API fetch failed:", e);
+      console.error("Skill data fetch failed:", e);
     }
-  }, [skillNodes]);
+  }, []);
 
-
-  const levelUpSkill = useCallback(async (path: string, nodeId: string) => {
+  const levelUpSkill = useCallback(async (nodeId: string, pathId: string) => {
     try {
-      const res = await api.levelUpSkill(path, nodeId);
-      const nodes = await api.getSkillLevels(path);
-      setSkillNodes(p => ({ ...p, [path]: nodes }));
+      const res = await api.levelUpSkill(nodeId, pathId);
+      const sd = await api.getSkillLevels();
+      setSkillData(sd);
       handleXp(res, "Skill upgraded");
     } catch (e: any) {
       const msg = e?.message || String(e);
@@ -196,8 +198,8 @@ export function useGameState(): UseGameState {
   }, [handleXp, pushToast]);
 
   // ── Task actions ───────────────────────────────────────────────────────────
-  const createTask = useCallback(async (text: string, xp: number, cat: string) => {
-    const t = await api.createTask({ text, xp_reward: xp, category: cat });
+  const createTask = useCallback(async (text: string, xp: number, _cat: string) => {
+    const t = await api.createTask({ title: text, xpReward: xp });
     setTasks(prev => [t, ...prev]);
   }, []);
 
@@ -219,21 +221,21 @@ export function useGameState(): UseGameState {
   }, []);
 
   // ── Grind actions ──────────────────────────────────────────────────────────
-  const loadSessions = useCallback(async (platform: string) => {
-    const s = await api.listGrindSessions(platform);
-    setSessions(prev => ({ ...prev, [platform]: s }));
+  const loadSessions = useCallback(async (_platform: string) => {
+    const s = await api.listGrindSessions();
+    setSessions(s);
   }, []);
 
   const logSession = useCallback(async (s: any) => {
     const res = await api.logGrindSession(s);
-    const updated = await api.listGrindSessions(s.platform);
-    setSessions(prev => ({ ...prev, [s.platform]: updated }));
+    const updated = await api.listGrindSessions();
+    setSessions(updated);
     handleXp(res, s.topic);
   }, [handleXp]);
 
   // ── Project actions ────────────────────────────────────────────────────────
   const createProject = useCallback(async (title: string, type: string) => {
-    const p = await api.createProject({ title, project_type: type });
+    const p = await api.createProject({ title, description: type });
     setProjects(prev => [p, ...prev]);
   }, []);
 
@@ -269,11 +271,30 @@ export function useGameState(): UseGameState {
   const readNote = useCallback((path: string) => api.readVaultNote(path), []);
   const writeNote = useCallback((path: string, content: string) => api.writeVaultNote(path, content), []);
 
+  // Backward-compat: skillNodes keyed by role, each containing the full SkillData
+  // Dashboard and legacy code expects Record<string, SkillData>
+  const skillNodes: Record<string, SkillData> = useMemo(() => {
+    if (!skillData) return {};
+    const roles = skillData.roles ?? [];
+    const out: Record<string, SkillData> = {};
+    for (const r of roles) {
+      out[r.id] = skillData;
+    }
+    // Fallback if no roles loaded yet
+    if (!roles.length) out["mle"] = skillData;
+    return out;
+  }, [skillData]);
+
+  const loadSkillPath = useCallback(async (_path: string) => {
+    await refreshSkills();
+  }, [refreshSkills]);
+
   return {
     user, tasks, goals, projects, sleepLogs, activity,
-    vaultNotes, skillNodes, sessions, loading, toasts,
+    vaultNotes, skillData, sessions, loading, toasts,
     pushToast, refreshUser,
-    loadSkillPath, levelUpSkill,
+    refreshSkills, levelUpSkill,
+    skillNodes, loadSkillPath,
     createTask, completeTask, deleteTask,
     updateGoal,
     loadSessions, logSession,
