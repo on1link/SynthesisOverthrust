@@ -10,26 +10,25 @@ import { useCallback, useEffect, useState } from "react";
 
 // ── Phase 1 components ────────────────────────────────────────────────────────
 import Dashboard from "./components/Dashboard";
-import Grind from "./components/Grind";
-import Projects from "./components/Projects";
+// import Grind from "./components/Grind";
+// import Projects from "./components/Projects";
 import Sidebar from "./components/Sidebar";
 import Skills from "./components/Skills";
 import Toast from "./components/Toast";
-import Vault from "./components/Vault";
-import Vitals from "./components/Vitals";
+// import Vault from "./components/Vault";
+// import Vitals from "./components/Vitals";
 import { useGameState } from "./hooks/useGameState";
 
 // ── Phase 2 views ─────────────────────────────────────────────────────────────
-import AITutor from "./views/AITutor";
-import Analytics from "./views/Analytics";
-import SpacedRepetition from "./views/SpacedRepetition";
+// import AITutor from "./views/AITutor";
+// import Analytics from "./views/Analytics";
+// import SpacedRepetition from "./views/SpacedRepetition";
 
 // ── Phase 3 views ─────────────────────────────────────────────────────────────
-import KnowledgeGraph from "./views/KnowledgeGraph";
-import PluginManager from "./views/PluginManager";
-import Settings from "./views/Settings";
-import StudyRoom from "./views/StudyRoom";
-//import Settings       from "./views/Settings";
+// import KnowledgeGraph from "./views/KnowledgeGraph";
+// import PluginManager from "./views/PluginManager";
+// import Settings from "./views/Settings";
+// import StudyRoom from "./views/StudyRoom";
 import Onboarding from "./views/Onboarding";
 
 // ── Design tokens ─────────────────────────────────────────────────────────────
@@ -37,9 +36,10 @@ import { C, F } from "./tokens";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type View =
-  | "dashboard" | "skills" | "grind" | "projects" | "vitals" | "vault"
-  | "sr" | "ai" | "analytics"
-  | "graph" | "rooms" | "plugins" | "settings" | "onboard";
+  | "dashboard" | "skills" | "onboard";
+// | "grind" | "projects" | "vitals" | "vault"
+// | "sr" | "ai" | "analytics"
+// | "graph" | "rooms" | "plugins" | "settings"
 
 // ── Sidecar status banner ─────────────────────────────────────────────────────
 function SidecarBanner({ status }: { status: string }) {
@@ -63,18 +63,18 @@ function SidecarBanner({ status }: { status: string }) {
 }
 
 // ── SR due count badge ────────────────────────────────────────────────────────
-function useSrDueCount() {
-  const [count, setCount] = useState(0);
-  useEffect(() => {
-    const load = () => invoke<{ length: number }>("sr_get_due", { limit: 50 })
-      .then((r: any) => setCount(Array.isArray(r) ? r.length : 0))
-      .catch(() => { });
-    load();
-    const interval = setInterval(load, 60_000);
-    return () => clearInterval(interval);
-  }, []);
-  return count;
-}
+// function useSrDueCount() {
+//   const [count, setCount] = useState(0);
+//   useEffect(() => {
+//     const load = () => invoke<{ length: number }>("sr_get_due", { limit: 50 })
+//       .then((r: any) => setCount(Array.isArray(r) ? r.length : 0))
+//       .catch(() => { });
+//     load();
+//     const interval = setInterval(load, 60_000);
+//     return () => clearInterval(interval);
+//   }, []);
+//   return count;
+// }
 
 // ── Root App ─── 
 export default function App() {
@@ -83,7 +83,7 @@ export default function App() {
   const [sidecarStatus, setSidecarStatus] = useState("");
   const [showOnboard, setShowOnboard] = useState(false);
   const gameState = useGameState();
-  const srDue = useSrDueCount();
+  // const srDue = useSrDueCount();
 
   // Listen for sidecar status events from Rust
   useEffect(() => {
@@ -145,49 +145,49 @@ export default function App() {
     skills: (
       <Skills
         user={gameState.user}
-        skillNodes={gameState.skillNodes}
-        loadSkillPath={gameState.loadSkillPath}
+        skillData={gameState.skillData}
+        refreshSkills={gameState.refreshSkills}
         levelUpSkill={gameState.levelUpSkill}
       />
     ),
-    grind: (
-      <Grind
-        sessions={gameState.sessions}
-        loadSessions={gameState.loadSessions}
-        logSession={gameState.logSession}
-      />
-    ),
-    projects: (
-      <Projects
-        projects={gameState.projects}
-        createProject={gameState.createProject}
-        moveProject={gameState.moveProject}
-        deleteProject={gameState.deleteProject}
-      />
-    ),
-    vitals: (
-      <Vitals
-        sleepLogs={gameState.sleepLogs}
-        logSleep={gameState.logSleep}
-      />
-    ),
-    vault: (
-      <Vault
-        vaultNotes={gameState.vaultNotes}
-        setVaultPath={gameState.setVaultPath}
-        readNote={gameState.readNote}
-        writeNote={gameState.writeNote}
-      />
-    ),
+    // grind: (
+    //   <Grind
+    //     sessions={gameState.sessions}
+    //     loadSessions={gameState.loadSessions}
+    //     logSession={gameState.logSession}
+    //   />
+    // ),
+    // projects: (
+    //   <Projects
+    //     projects={gameState.projects}
+    //     createProject={gameState.createProject}
+    //     moveProject={gameState.moveProject}
+    //     deleteProject={gameState.deleteProject}
+    //   />
+    // ),
+    // vitals: (
+    //   <Vitals
+    //     sleepLogs={gameState.sleepLogs}
+    //     logSleep={gameState.logSleep}
+    //   />
+    // ),
+    //vault: (
+    //  <Vault
+    //    vaultNotes={gameState.vaultNotes}
+    //    setVaultPath={gameState.setVaultPath}
+    //    readNote={gameState.readNote}
+    //    writeNote={gameState.writeNote}
+    //  />
+    //),
     // Phase 2
-    sr: <SpacedRepetition />,
-    ai: <AITutor />,
-    analytics: <Analytics />,
-    // Phase 3
-    graph: <KnowledgeGraph />,
-    rooms: <StudyRoom />,
-    plugins: <PluginManager />,
-    settings: <Settings />,
+    // sr: <SpacedRepetition />,
+    // ai: <AITutor />,
+    // analytics: <Analytics />,
+    // // Phase 3
+    // graph: <KnowledgeGraph />,
+    // rooms: <StudyRoom />,
+    // plugins: <PluginManager />,
+    // settings: <Settings />,
     onboard: <Onboarding onComplete={() => setView("dashboard")} />,
   };
 
@@ -210,7 +210,7 @@ export default function App() {
         currentView={view}
         onNavigate={setView}
         gameState={gameState}
-        srDue={srDue}
+        srDue={0}
       />
       <main style={{ flex: 1, overflowY: "auto", padding: "28px 32px", marginTop: sidecarStatus && sidecarStatus !== "ready" ? 32 : 0 }}>
         {VIEWS[view]}
