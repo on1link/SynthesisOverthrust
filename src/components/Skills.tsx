@@ -1,53 +1,41 @@
 // ============================================================
 // SynthesisOverthrust — src/components/Skills.tsx
-// Ragnarok Online–style skill tree, updated for 002_skill_cycle:
-//   - Levels 0–5 (mastery-driven, not SP-only)
-//   - Level key: "node_id::path_id"
-//   - Detail panel: subtopic mastery bars + resources
-//   - Unlock check: prereqs via v_node_mastery
-//   - SP "Boost" still available as shortcut (+15 mastery / subtopic)
+// Vertical-scroll skill tree inspired by NewSkills design:
+//   - Left role sidebar
+//   - Horizontal tier tabs with scroll-spy
+//   - Vertically stacked tiers with squircle skill nodes
+//   - SVG dependency lines overlay
+//   - Full-page detail view with subtopic checklists
+//   - Backend-integrated mastery, unlocks, and progression
 // ============================================================
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
-import { useEffect, useState } from "react";
 import type {
-  LearningResource,
+  Difficulty,
   NodeLevel,
-  SkillData, SkillNode,
-  Subtopic
+  Role,
+  SkillData,
+  SkillNode,
+  Subtopic,
+  User,
 } from "../api";
 import { api } from "../api";
-import type { UseGameState } from "../hooks/useGameState";
-import {
-  C, F, bar, bezier, btn, card, col_, fill, glassCard,
-  h1, h3, levelArc, mono, row, tag
-} from "../tokens";
+import { C, F, BR, SHADOW, card, btn, tag, bar, fill, row, col_, h1, mono } from "../tokens";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-const R = 28;   // node radius
-const CW = 720;
-const CH = 620;
-const MAX_LEVEL = 5;
+const NODE_SIZE = 96;
 
-const TREE_META: Record<string, { col: string; icon: string; label: string }> = {
-  mle: { col: C.mle, icon: "⚡", label: "Machine Learning Engineer" },
-  ds: { col: C.ds, icon: "📊", label: "Data Scientist" },
-  de: { col: C.de, icon: "🗄", label: "Data Engineer" },
-  aie: { col: C.aie, icon: "🤖", label: "AI Engineer" },
+// ── Tier theme colours (inline, no Tailwind) ─────────────────────────────────
+const TIER_THEMES: Record<string, { accent: string; bg: string; border: string }> = {
+  tier_f:  { accent: "#64748b", bg: "rgba(100,116,139,0.08)", border: "rgba(100,116,139,0.2)" },
+  tier_1t: { accent: "#10b981", bg: "rgba(16,185,129,0.08)",  border: "rgba(16,185,129,0.2)" },
+  tier_2t: { accent: "#3b82f6", bg: "rgba(59,130,246,0.08)",  border: "rgba(59,130,246,0.2)" },
 };
-
-const PATH_COL: Record<string, string> = { mle: C.mle, ds: C.ds, de: C.de, aie: C.aie };
-const PATH_LBL: Record<string, string> = { mle: "MLE", ds: "DS", de: "DE", aie: "AIE" };
-const TIER_LABELS = ["FOUNDATIONS", "CORE SKILLS", "INTERMEDIATE", "ADVANCED", "MASTERY"];
+const defaultTierTheme = { accent: "#8b5cf6", bg: "rgba(139,92,246,0.08)", border: "rgba(139,92,246,0.2)" };
+const tierTheme = (id: string) => TIER_THEMES[id] || defaultTierTheme;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const getPrereqs = (n: SkillNode): string[] => {
-  const raw = n.prereqs;
-  if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
-  try { return JSON.parse(raw); } catch { return []; }
-};
-const getShared = (n: SkillNode): string[] => {
-  const raw = n.shared;
+const parseJsonArray = (raw: string | string[] | undefined): string[] => {
   if (!raw) return [];
   if (Array.isArray(raw)) return raw;
   try { return JSON.parse(raw); } catch { return []; }
@@ -55,543 +43,653 @@ const getShared = (n: SkillNode): string[] => {
 
 const levelKey = (nodeId: string, pathId: string) => `${nodeId}::${pathId}`;
 
-const getNodeLevel = (levels: SkillData["levels"], nodeId: string, pathId: string): NodeLevel =>
+const getNodeLevel = (levels: SkillData["levels"] = {}, nodeId: string, pathId: string): NodeLevel =>
   levels[levelKey(nodeId, pathId)] ?? { level: 0, avg_mastery: 0, mastered_subtopics: 0, xp_invested: 0, unlocked: false };
 
-const pathProgress = (data: SkillData, path: string): number => {
-  // Guard against the backend returning a HashMap (Object) instead of an Array
-  const safeNodes = Array.isArray(data.nodes) ? data.nodes : Object.values(data.nodes || {});
+const titleForMastery = (pct: number): string =>
+  pct === 0 ? "Locked" : pct < 20 ? "Novice" : pct < 40 ? "Apprentice" : pct < 60 ? "Adept" : pct < 80 ? "Expert" : "Master";
 
-  const pathNodes = safeNodes.filter((n: any) => n.path_id === path);
-  if (!pathNodes.length) return 0;
-
-  const total = pathNodes.reduce((s, n: any) => s + getNodeLevel(data.levels, n.id, path).level, 0);
-  return Math.round((total / (pathNodes.length * MAX_LEVEL)) * 100);
-};
-
-// Mastery level → visual state
-const nodeState = (levels: SkillData["levels"], n: SkillNode, path: string) => {
-  const nl = getNodeLevel(levels, n.id, path);
-  if (!nl.unlocked) return "locked";
-  if (nl.level >= MAX_LEVEL) return "maxed";
-  if (nl.level >= 4) return "expert";
-  if (nl.level >= 1) return "learning";
-  return "available";
-};
-
-// ── Mastery badge colors ──────────────────────────────────────────────────────
-const BADGE_COL: Record<string, string> = {
-  bronze: "#cd7f32", silver: "#c0c0c0", gold: "#ffd700", master: "#00e5ff", legend: "#ff00ff",
-};
-
-// ── Subtopic mastery bar ──────────────────────────────────────────────────────
-function SubtopicBar({ sub }: { sub: Subtopic }) {
-  const pct = sub.mastery;
-  const color = pct >= 80 ? C.green : pct >= 40 ? C.gold : C.muted;
-  return (
-    <div style={{ marginBottom: 8 }}>
-      <div style={{ ...row(6), justifyContent: "space-between", marginBottom: 3 }}>
-        <span style={{ fontFamily: F.body, fontSize: 11, color: pct >= 1 ? C.text2 : C.muted }}>{sub.name}</span>
-        <div style={{ ...row(6) }}>
-          {sub.practice_count > 0 && (
-            <span style={{ fontFamily: F.mono, fontSize: 9, color: C.muted }}>
-              {sub.accuracy}% acc
-            </span>
-          )}
-          <span style={{ fontFamily: F.mono, fontSize: 10, color, fontWeight: 700 }}>{pct}%</span>
-        </div>
-      </div>
-      <div style={{ height: 5, borderRadius: 3, background: C.border, overflow: "hidden" }}>
-        <div style={{
-          width: `${pct}%`, height: "100%", borderRadius: 3,
-          background: `linear-gradient(90deg,${color}88,${color})`,
-          transition: "width 0.5s ease",
-          boxShadow: pct >= 80 ? `0 0 6px ${color}66` : "none",
-        }} />
-      </div>
-    </div>
-  );
+// ── Props ─────────────────────────────────────────────────────────────────────
+interface SkillsProps {
+  user: User | null;
+  skillData: SkillData | null;
+  refreshSkills: () => Promise<void>;
+  levelUpSkill: (nodeId: string, pathId: string) => Promise<void>;
 }
 
-// ── Resource list item ────────────────────────────────────────────────────────
-const TYPE_ICON: Record<string, string> = {
-  book: "📚", course: "🎓", paper: "📄", video: "📹", blog: "🔗", tool: "🛠"
-};
-
-function ResourceItem({ res }: { res: LearningResource }) {
-  const col = res.finished ? C.green : res.pct_complete > 0 ? C.gold : C.muted;
-  return (
-    <div style={{ ...row(10), padding: "8px 0", borderBottom: `1px solid ${C.border}30` }}>
-      <span style={{ fontSize: 14, flexShrink: 0 }}>{TYPE_ICON[res.type] ?? "📌"}</span>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontFamily: F.body, fontSize: 11, color: C.text, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-          {res.url ? (
-            <a href={res.url} target="_blank" rel="noreferrer"
-              style={{ color: C.accent, textDecoration: "none" }}>{res.title}</a>
-          ) : res.title}
-        </div>
-        <div style={{ ...row(6), marginTop: 2 }}>
-          <span style={{ fontFamily: F.mono, fontSize: 9, color: C.muted }}>{res.est_hours}h</span>
-          {res.is_free && <span style={{ ...tag(C.green, true) as object, fontSize: 8 }}>FREE</span>}
-        </div>
-      </div>
-      <div style={{ flexShrink: 0, textAlign: "right" }}>
-        <div style={{ fontFamily: F.mono, fontSize: 10, color, fontWeight: 700 }}>
-          {res.finished ? "✓" : res.pct_complete > 0 ? `${res.pct_complete}%` : "—"}
-        </div>
-        {!res.finished && res.pct_complete === 0 && (
-          <button
-            onClick={() => api.updateResourceProgress(res.id, 1)}
-            style={{ fontFamily: F.display, fontSize: 8, color: C.muted, background: "transparent", border: `1px solid ${C.border}`, borderRadius: 4, cursor: "pointer", padding: "1px 5px", marginTop: 2 }}>
-            Start
-          </button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── Main component ────────────────────────────────────────────────────────────
-export default function Skills({ user, skillNodes, loadSkillPath, levelUpSkill }: Props) {
-  const [path, setPath] = useState("mle");
-  const [selNode, setSelNode] = useState<SkillNode | null>(null);
+// ══════════════════════════════════════════════════════════════════════════════
+// MAIN COMPONENT
+// ══════════════════════════════════════════════════════════════════════════════
+export default function Skills({ skillData, refreshSkills, levelUpSkill }: SkillsProps) {
+  const [activeRole, setActiveRole] = useState<string>("");
+  const [freeMode, setFreeMode] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
-  const [resources, setResources] = useState<LearningResource[]>([]);
-  const [panel, setPanel] = useState<"subtopics" | "resources">("subtopics");
-  const [boosting, setBoosting] = useState(false);
+  const [activeTierId, setActiveTierId] = useState<string>("");
 
-  useEffect(() => { loadSkillPath(path); }, [path, loadSkillPath]);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const tierRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const nodeRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [lines, setLines] = useState<{ path: string; met: boolean }[]>([]);
 
-  const rawNodes = skillNodes[path] ?? [];
-  const nodes = Array.isArray(rawNodes) ? rawNodes : Object.values(rawNodes);
+  // ── Derived data ──────────────────────────────────────────────────────────
+  const roles: Role[] = useMemo(() => skillData?.roles ?? [], [skillData]);
+  const diffs: Difficulty[] = useMemo(() => skillData?.difficulties ?? [], [skillData]);
+  const allNodes: SkillNode[] = useMemo(() => {
+    const n = skillData?.nodes;
+    return Array.isArray(n) ? n : Object.values(n || {});
+  }, [skillData]);
+  const levels = skillData?.levels ?? {};
+  const nodeMap = useMemo(() => Object.fromEntries(allNodes.map(n => [n.id, n])), [allNodes]);
 
-  const meta = TREE_META[path];
-  const col = meta.col;
-  const sp = user?.sp ?? 0;
-  const userLevels = (user as any)?.skillData?.[path]?.levels ?? {};
+  // Init defaults
+  useEffect(() => {
+    if (!activeRole && roles.length) setActiveRole(roles[0].id);
+  }, [roles, activeRole]);
+  useEffect(() => {
+    if (!activeTierId && diffs.length) setActiveTierId(diffs[0].id);
+  }, [diffs, activeTierId]);
 
-  const data: SkillData = {
-    nodes: nodes,
-    levels: userLevels,
+  // Role colour
+  const roleCol = useCallback((roleId?: string) => {
+    const r = roles.find(r => r.id === (roleId ?? activeRole));
+    return r?.color || C.accent;
+  }, [roles, activeRole]);
+  const col = roleCol();
+
+  // Nodes for current role, grouped by tier
+  const roleNodes = useMemo(
+    () => allNodes.filter(n => n.path_id === activeRole),
+    [allNodes, activeRole],
+  );
+
+  // ── Unlock logic ──────────────────────────────────────────────────────────
+  const isUnlocked = useCallback((sk: SkillNode): boolean => {
+    if (freeMode) return true;
+    const nl = getNodeLevel(levels, sk.id, activeRole);
+    if (nl.unlocked) return true;
+    const prereqs = parseJsonArray(sk.prereqs);
+    if (!prereqs.length) return true;
+    return prereqs.every(pid => getNodeLevel(levels, pid, activeRole).level > 0);
+  }, [levels, activeRole, freeMode]);
+
+  // Path progress
+  const pathProgress = useMemo(() => {
+    if (!roleNodes.length) return 0;
+    const total = roleNodes.reduce((s, n) => s + (n.item_count || 0), 0);
+    const done = roleNodes.reduce((s, n) => s + getNodeLevel(levels, n.id, activeRole).mastered_subtopics, 0);
+    return total > 0 ? Math.round((done / total) * 100) : 0;
+  }, [roleNodes, levels, activeRole]);
+
+  // Total SP spent (sum of all invested xp across role)
+  const totalSpent = useMemo(
+    () => roleNodes.reduce((s, n) => s + getNodeLevel(levels, n.id, activeRole).mastered_subtopics, 0),
+    [roleNodes, levels, activeRole],
+  );
+
+  // ── Dependency lines ──────────────────────────────────────────────────────
+  const updateLines = useCallback(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const sr = sc.getBoundingClientRect();
+    const newLines: { path: string; met: boolean }[] = [];
+
+    roleNodes.forEach(child => {
+      const pids = parseJsonArray(child.prereqs);
+      if (!pids.length) return;
+      const childEl = nodeRefs.current[child.id];
+      if (!childEl) return;
+      const cr = childEl.getBoundingClientRect();
+      const cx = cr.left - sr.left + cr.width / 2;
+      const cy = cr.top - sr.top + sc.scrollTop;
+
+      pids.forEach(pid => {
+        const parentEl = nodeRefs.current[pid];
+        const parent = nodeMap[pid];
+        if (!parentEl || !parent) return;
+        const pr = parentEl.getBoundingClientRect();
+        const px = pr.left - sr.left + pr.width / 2;
+        const py = pr.bottom - sr.top + sc.scrollTop;
+        const met = getNodeLevel(levels, pid, activeRole).level > 0 || freeMode;
+        const midY = py + (cy - py) / 2;
+        const path = Math.abs(px - cx) < 3
+          ? `M${px},${py} L${cx},${cy}`
+          : `M${px},${py} L${px},${midY} L${cx},${midY} L${cx},${cy}`;
+        newLines.push({ path, met });
+      });
+    });
+    setLines(newLines);
+  }, [roleNodes, nodeMap, levels, activeRole, freeMode]);
+
+  useEffect(() => {
+    const t = setTimeout(updateLines, 120);
+    window.addEventListener("resize", updateLines);
+    return () => { clearTimeout(t); window.removeEventListener("resize", updateLines); };
+  }, [updateLines]);
+
+  // ── Scroll-spy for tier tabs ──────────────────────────────────────────────
+  useEffect(() => {
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const obs = new IntersectionObserver(
+      entries => entries.forEach(e => { if (e.isIntersecting) setActiveTierId(e.target.id); }),
+      { root: sc, rootMargin: "-20% 0px -60% 0px", threshold: 0 },
+    );
+    diffs.forEach(d => { const el = tierRefs.current[d.id]; if (el) obs.observe(el); });
+    return () => obs.disconnect();
+  }, [diffs, activeRole]);
+
+  const scrollToTier = (id: string) => {
+    tierRefs.current[id]?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const prog = pathProgress(data, path);
-  const nodeMap = Object.fromEntries(nodes.map(n => [n.id, n]));
-
-  // ── Load subtopics + resources when a node is selected ───────────────────
+  // ── Subtopic fetching ─────────────────────────────────────────────────────
   useEffect(() => {
+    if (!detailId) { setSubtopics([]); return; }
     let active = true;
-    setSubtopics([]);
-    setResources([]);
-
-    if (!selNode) return;
-
-    api.getSubtopics(selNode.id, path).then(data => {
-      if (active) setSubtopics(data);
-    }).catch(() => { });
-
-    api.listResources(selNode.id, path).then(data => {
-      if (active) setResources(data);
-    }).catch(() => { });
-
+    api.getSubtopics(detailId, activeRole)
+      .then(subs => { if (active) setSubtopics(subs); })
+      .catch(err => console.error("get_subtopics failed:", err));
     return () => { active = false; };
-  }, [selNode?.id, path]);
+  }, [detailId, activeRole]);
 
-  // ── Connection lines ──────────────────────────────────────────────────────
-  const conns: { from: SkillNode; to: SkillNode }[] = [];
-  nodes.forEach(n => {
-    getPrereqs(n).forEach(pid => {
-      const p = nodeMap[pid];
-      if (p) conns.push({ from: p, to: n });
-    });
-  });
+  // ── Mastery actions ───────────────────────────────────────────────────────
+  const checkDependentUnlocks = useCallback(async (changedNodeId: string) => {
+    const dependents = allNodes.filter(
+      n => n.path_id === activeRole && parseJsonArray(n.prereqs).includes(changedNodeId),
+    );
+    await Promise.all(dependents.map(d => api.checkNodeUnlock(d.id, activeRole).catch(() => {})));
+  }, [allNodes, activeRole]);
 
-  // ── Selected node helpers ─────────────────────────────────────────────────
-  const sn = selNode ? nodeMap[selNode.id] : null;
-  const snNL = sn ? getNodeLevel(data.levels, sn.id, path) : null;
-  const snSt = sn ? nodeState(data.levels, sn, path) : null;
-  const snLv = snNL?.level ?? 0;
-  const snPre = sn ? getPrereqs(sn) : [];
-  const snSh = sn ? getShared(sn) : [];
+  const toggleSubtopic = useCallback(async (sub: Subtopic) => {
+    const delta = sub.mastery >= 80 ? -sub.mastery : (100 - sub.mastery);
+    try {
+      await api.updateSubtopicMastery(sub.id, activeRole, delta);
+      const [subs] = await Promise.all([
+        api.getSubtopics(sub.node_id, activeRole),
+        checkDependentUnlocks(sub.node_id),
+      ]);
+      setSubtopics(subs);
+      await refreshSkills();
+    } catch { }
+  }, [activeRole, refreshSkills, checkDependentUnlocks]);
 
+  const completeAll = useCallback(async (nodeId: string) => {
+    const subs = await api.getSubtopics(nodeId, activeRole).catch(() => []);
+    for (const sub of subs) {
+      if (sub.mastery < 80) await api.updateSubtopicMastery(sub.id, activeRole, 100 - sub.mastery).catch(() => {});
+    }
+    const updated = await api.getSubtopics(nodeId, activeRole).catch(() => []);
+    setSubtopics(updated);
+    await checkDependentUnlocks(nodeId);
+    await refreshSkills();
+  }, [activeRole, refreshSkills, checkDependentUnlocks]);
+
+  const resetAll = useCallback(async (nodeId: string) => {
+    const subs = await api.getSubtopics(nodeId, activeRole).catch(() => []);
+    for (const sub of subs) {
+      if (sub.mastery > 0) await api.updateSubtopicMastery(sub.id, activeRole, -sub.mastery).catch(() => {});
+    }
+    const updated = await api.getSubtopics(nodeId, activeRole).catch(() => []);
+    setSubtopics(updated);
+    await checkDependentUnlocks(nodeId);
+    await refreshSkills();
+  }, [activeRole, refreshSkills, checkDependentUnlocks]);
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // DETAIL VIEW
+  // ══════════════════════════════════════════════════════════════════════════
+  if (detailId) {
+    const sk = nodeMap[detailId];
+    if (!sk) { setDetailId(null); return null; }
+    const nl = getNodeLevel(levels, sk.id, activeRole);
+    const lv = nl.level;
+    const topicMax = sk.topic_count || 1;
+    const totalItems = sk.item_count || subtopics.length || 1;
+    const doneItems = subtopics.filter(s => s.mastery >= 80).length;
+    const pct = Math.round((doneItems / totalItems) * 100);
+    const shared = parseJsonArray(sk.shared);
+    const prereqs = parseJsonArray(sk.prereqs).map(pid => nodeMap[pid]).filter(Boolean);
+    const unlocks = allNodes.filter(n => n.path_id === activeRole && parseJsonArray(n.prereqs).includes(sk.id));
+
+    return (
+      <div className="nf-view" style={{ ...col_(16), minHeight: "100%", color: C.text, padding: 24, overflowY: "auto" }}>
+        {/* Back */}
+        <button onClick={() => setDetailId(null)} style={{ ...btn(C.muted, true), alignSelf: "flex-start", marginBottom: 8 }}>
+          ← BACK
+        </button>
+
+        {/* Header */}
+        <div style={{ display: "flex", gap: 20, alignItems: "flex-start", paddingBottom: 20, borderBottom: `1px solid ${C.border}`, flexWrap: "wrap" }}>
+          <div style={{ fontSize: "2.8rem", minWidth: 52 }}>{sk.icon}</div>
+          <div style={{ flex: 1, minWidth: 200 }}>
+            <div style={{ display: "flex", gap: 5, marginBottom: 8, flexWrap: "wrap" }}>
+              {shared.map(rid => {
+                const r = roles.find(r => r.id === rid);
+                return <div key={rid} style={{ ...(tag(r?.color || C.accent, true) as object), fontSize: 9 }}>{rid.toUpperCase()}</div>;
+              })}
+            </div>
+            <h1 style={{ ...h1, fontSize: 22, color: col, marginBottom: 4 }}>{sk.name}</h1>
+            <div style={{ ...mono(11, C.muted), marginBottom: 10 }}>
+              {titleForMastery(pct)} · {topicMax} {topicMax === 1 ? "topic" : "topics"} · {doneItems}/{totalItems} subtopics
+            </div>
+            {/* Level dots */}
+            <div style={{ ...row(3), marginBottom: 8, flexWrap: "wrap" }}>
+              {Array.from({ length: topicMax }).map((_, i) => (
+                <div key={i} style={{ width: 20, height: 9, borderRadius: BR.xs, border: `2px solid ${col}`, background: i < lv ? col : "transparent", opacity: i < lv ? 1 : 0.2 }} />
+              ))}
+              <span style={{ ...mono(10, C.muted), marginLeft: 6 }}>LV {lv}/{topicMax}</span>
+            </div>
+            <p style={{ fontFamily: F.body, fontSize: 13, lineHeight: 1.7, color: C.text2, maxWidth: 560 }}>{sk.description}</p>
+            {/* Progress bar */}
+            <div style={{ ...bar, marginTop: 8, maxWidth: 340 }}>
+              <div style={fill(pct, col) as object} className="nf-bar-fill" />
+            </div>
+          </div>
+        </div>
+
+        {/* Level badge */}
+        <div style={{ ...(card(col) as object), padding: "8px 14px", display: "flex", alignItems: "center", gap: 10 }}>
+          <span style={{ fontFamily: F.mono, fontSize: 15, fontWeight: 700, color: col }}>LV {lv}</span>
+          <span style={{ ...mono(11, C.muted) }}>{titleForMastery(pct)}</span>
+          <span style={{ marginLeft: "auto", ...mono(11, C.muted) }}>{doneItems}/{totalItems} ({pct}%)</span>
+        </div>
+
+        {/* Subtopics checklist */}
+        <div style={{ ...(card(col) as object), padding: "16px 20px" }}>
+          <div style={{ fontFamily: F.display, fontSize: 10, letterSpacing: 3, color: C.muted, paddingBottom: 8, marginBottom: 12, borderBottom: `1px solid ${C.border}`, textTransform: "uppercase" }}>
+            SUBTOPICS — check items to level up
+          </div>
+          {subtopics.length > 0 ? (() => {
+            const grouped: { header: string; items: Subtopic[] }[] = [];
+            for (const sub of subtopics) {
+              const header = sub.description || "General";
+              const last = grouped[grouped.length - 1];
+              if (last && last.header === header) last.items.push(sub);
+              else grouped.push({ header, items: [sub] });
+            }
+            return (
+              <div style={col_(20)}>
+                {grouped.map((group, gi) => {
+                  const gDone = group.items.filter(s => s.mastery >= 80).length;
+                  const gPct = Math.round((gDone / group.items.length) * 100);
+                  return (
+                    <div key={gi}>
+                      <div style={{ ...row(8), justifyContent: "space-between", marginBottom: 8, paddingBottom: 6, borderBottom: `1px solid ${col}22` }}>
+                        <span style={{ fontFamily: F.display, fontSize: 12, fontWeight: 700, letterSpacing: 1.5, color: col, textTransform: "uppercase" }}>{group.header}</span>
+                        <span style={{ ...mono(10, C.muted) }}>{gDone}/{group.items.length} ({gPct}%)</span>
+                      </div>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 4 }}>
+                        {group.items.map(sub => {
+                          const checked = sub.mastery >= 80;
+                          return (
+                            <div key={sub.id} onClick={() => toggleSubtopic(sub)}
+                              style={{ ...row(7), padding: "6px 4px", cursor: "pointer", borderRadius: BR.xs, minHeight: 44, transition: "background 0.15s" }}
+                              onMouseEnter={e => (e.currentTarget.style.background = C.surface2)}
+                              onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                            >
+                              <div style={{ width: 20, height: 20, borderRadius: BR.xs, flexShrink: 0, border: `2px solid ${col}`, background: checked ? col : "transparent", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 10, color: checked ? C.bg : col, transition: "all 0.15s" }}>
+                                {checked ? "✓" : ""}
+                              </div>
+                              <span style={{ fontFamily: F.body, fontSize: 12, lineHeight: 1.45, flex: 1, color: checked ? C.muted : C.text, textDecoration: checked ? "line-through" : "none" }}>{sub.name}</span>
+                              {sub.practice_count > 0 && <span style={{ ...mono(9, C.muted) }}>{sub.accuracy}%</span>}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })() : (
+            <div style={{ fontFamily: F.body, fontSize: 12, color: C.muted, textAlign: "center", padding: "20px 0" }}>No subtopics loaded</div>
+          )}
+        </div>
+
+        {/* Prerequisites & Unlocks */}
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>
+          {[
+            { label: "PREREQUISITES", list: prereqs, empty: "Foundation — no prereqs" },
+            { label: "UNLOCKS", list: unlocks, empty: "Mastery — top of tree" },
+          ].map((sec, si) => (
+            <div key={si} style={{ ...(card() as object), padding: "14px 16px" }}>
+              <div style={{ fontFamily: F.display, fontSize: 10, letterSpacing: 3, color: C.muted, marginBottom: 8, textTransform: "uppercase" }}>{sec.label}</div>
+              {sec.list.length ? sec.list.map((p: SkillNode) => {
+                const pNl = getNodeLevel(levels, p.id, activeRole);
+                return (
+                  <div key={p.id} onClick={() => setDetailId(p.id)}
+                    style={{ ...row(8), padding: "6px 8px", borderRadius: BR.xs, cursor: "pointer", minHeight: 44, fontSize: 12, fontFamily: F.body, color: C.text, border: `1px solid ${C.border}`, marginBottom: 3, transition: "background 0.15s" }}
+                    onMouseEnter={e => (e.currentTarget.style.background = C.surface2)}
+                    onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
+                  >
+                    <span>{p.icon}</span>
+                    <span>{p.name}</span>
+                    <span style={{ ...(tag(col, true) as object), fontSize: 9, marginLeft: "auto" }}>LV {pNl.level}/{p.topic_count || 1}</span>
+                  </div>
+                );
+              }) : <div style={{ fontSize: 12, color: C.muted }}>{sec.empty}</div>}
+            </div>
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div style={{ ...row(8) }}>
+          <button onClick={() => completeAll(sk.id)} style={btn(C.green, true)}>✓ COMPLETE ALL</button>
+          <button onClick={() => resetAll(sk.id)} style={btn(C.red, true)}>↺ RESET</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ══════════════════════════════════════════════════════════════════════════
+  // MAIN TREE VIEW
+  // ══════════════════════════════════════════════════════════════════════════
   return (
-    <div className="nf-view" style={col_(18)}>
+    <div className="nf-view" style={{ display: "flex", height: "100%", color: C.text, overflow: "hidden" }}>
 
-      {/* Header */}
-      <div style={{ ...row(16), justifyContent: "space-between", flexWrap: "wrap", gap: 10 }}>
-        <div>
-          <div style={{ fontFamily: F.mono, color: col, fontSize: 10, letterSpacing: 4, marginBottom: 4 }}>
-            // SKILL FORGE
-          </div>
-          <h1 style={h1}>Skill Tree</h1>
-        </div>
-        <div style={{ ...glassCard(C.purple) as object, padding: "12px 20px", display: "flex", alignItems: "center", gap: 16 }}>
-          <div style={{ textAlign: "center" }}>
-            <div style={{ fontFamily: F.mono, fontSize: 32, color: C.purple, lineHeight: 1, fontWeight: 700 }}>{sp}</div>
-            <div style={{ fontFamily: F.display, fontSize: 9, color: C.muted, letterSpacing: 2, marginTop: 2 }}>SKILL POINTS</div>
-          </div>
-          <div style={{ fontFamily: F.body, fontSize: 11, color: C.muted, maxWidth: 140, lineHeight: 1.6 }}>
-            Practice subtopics or spend SP to boost a skill.
-          </div>
-        </div>
+      {/* ── COL 1: Role Sidebar ──────────────────────────────────────── */}
+      <div style={{
+        width: 80, flexShrink: 0, background: C.surface, borderRight: `1px solid ${C.border}`,
+        display: "flex", flexDirection: "column", alignItems: "center", paddingTop: 28, gap: 20, overflowY: "auto",
+      }}>
+        {roles.map(r => {
+          const active = activeRole === r.id;
+          const rCol = r.color || C.accent;
+          return (
+            <button key={r.id} onClick={() => { setActiveRole(r.id); setDetailId(null); }}
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 6,
+                background: "none", border: "none", cursor: "pointer", color: active ? rCol : C.muted,
+                transition: "all 0.2s",
+              }}
+            >
+              <div style={{
+                width: 48, height: 48, borderRadius: 16, display: "flex", alignItems: "center", justifyContent: "center",
+                background: active ? rCol : C.surface2, color: active ? "#fff" : C.muted,
+                boxShadow: active ? `0 4px 16px ${rCol}44` : "none",
+                fontSize: 20, fontWeight: 700, transition: "all 0.25s",
+                transform: active ? "scale(1.1)" : "scale(1)",
+              }}>
+                {r.name.charAt(0)}
+              </div>
+              <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 1.5, textTransform: "uppercase", fontFamily: F.mono }}>{r.id}</span>
+            </button>
+          );
+        })}
       </div>
 
-      {/* Path tabs */}
-      <div style={{ ...row(8), flexWrap: "wrap" }}>
-        {Object.entries(TREE_META).map(([key, m]) => (
-          <button key={key} className="nf-btn"
-            onClick={() => { setPath(key); setSelNode(null); }}
-            style={{ ...btn(m.col), opacity: path === key ? 1 : 0.35, background: path === key ? `${m.col}22` : "transparent" }}>
-            {m.icon} {m.label}
-          </button>
-        ))}
-      </div>
+      {/* ── COL 2: Skill Canvas (centre) ─────────────────────────────── */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0 }}>
 
-      {/* Path progress banner */}
-      <div style={{ ...glassCard(col) as object, padding: "14px 20px" }}>
-        <div style={row(16)}>
-          <div style={{ fontSize: 36, flexShrink: 0 }}>{meta.icon}</div>
-          <div style={{ flex: 1 }}>
-            <div style={{ ...row(), justifyContent: "space-between", marginBottom: 6 }}>
-              <span style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: col }}>{meta.label}</span>
-              <span style={mono(12) as React.CSSProperties}>{prog}% mastery</span>
+        {/* Top bar */}
+        <div style={{ flexShrink: 0, borderBottom: `1px solid ${C.border}`, background: C.surface }}>
+          {/* Title row */}
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "10px 24px", borderBottom: `1px solid ${C.border}` }}>
+            <div>
+              <div style={{ fontFamily: F.mono, color: col, fontSize: 9, letterSpacing: 4, marginBottom: 2 }}>// NEURALFORGE</div>
+              <h2 style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.text, margin: 0, letterSpacing: 1 }}>Path Progression</h2>
             </div>
-            <div style={bar}>
-              <div style={fill(prog, col, 8)} className="nf-bar-fill" />
-            </div>
+            {/* Mode toggle */}
+            <button onClick={() => setFreeMode(v => !v)}
+              style={{
+                ...row(6), padding: "5px 14px", borderRadius: BR.pill, cursor: "pointer",
+                background: freeMode ? `${C.gold}22` : `${C.muted}15`,
+                border: `1px solid ${freeMode ? C.gold + "55" : C.border}`,
+                color: freeMode ? C.gold : C.muted, fontFamily: F.mono, fontSize: 10, fontWeight: 700,
+                letterSpacing: 1, transition: "all 0.2s",
+              }}
+            >
+              {freeMode ? "🔓" : "🔒"} {freeMode ? "FREE SANDBOX" : "STRICT PATH"}
+            </button>
           </div>
-          <div style={{ textAlign: "center", flexShrink: 0 }}>
-            <div style={{ fontFamily: F.mono, fontSize: 32, color: col, lineHeight: 1 }}>{prog}</div>
-            <div style={{ fontFamily: F.display, fontSize: 9, color: C.muted, letterSpacing: 2 }}>MASTERY %</div>
-          </div>
-        </div>
-      </div>
 
-      {/* Legend */}
-      <div style={{ ...row(16), flexWrap: "wrap" }}>
-        {[
-          { l: "Locked", bg: "#07071a", bd: "#1e1e3c", dash: false },
-          { l: "Available", bg: `${col}18`, bd: col, dash: false },
-          { l: "Learning", bg: `${col}33`, bd: col, dash: false },
-          { l: "Expert", bg: `${col}55`, bd: col, dash: false },
-          { l: "Mastered", bg: "#1a1200", bd: "#ffd700", dash: false },
-          { l: "Shared", bg: "none", bd: C.gold, dash: true },
-        ].map(x => (
-          <div key={x.l} style={{ ...row(5), fontSize: 11, fontFamily: F.display, color: C.muted }}>
-            <svg width={16} height={16}>
-              <circle cx={8} cy={8} r={6} fill={x.bg} stroke={x.bd} strokeWidth={1.5}
-                strokeDasharray={x.dash ? "3,2" : "none"} />
-            </svg>
-            {x.l}
-          </div>
-        ))}
-        <div style={{ marginLeft: "auto", ...mono(9) }}>Click node → inspect · practice · boost</div>
-      </div>
-
-      {/* Tree + panel */}
-      <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-
-        {/* ── SVG canvas ──────────────────────────────────────────────────── */}
-        <div style={{ flex: 1, overflowX: "auto", background: C.surface2, borderRadius: 14, border: `1px solid ${C.border}`, padding: "8px 4px" }}>
-          <svg width={CW} height={CH} style={{ display: "block" }}>
-            {/* Tier grid */}
-            {[128, 248, 368, 488, 608].map(y => (
-              <line key={y} x1={10} y1={y} x2={CW - 10} y2={y} stroke={C.border} strokeWidth={1} strokeDasharray="4,10" opacity={0.5} />
-            ))}
-            {TIER_LABELS.map((lbl, i) => (
-              <text key={i} x={14} y={50 + i * 120} fontSize={7.5} fill={C.muted} fontFamily={F.mono} letterSpacing={2.5} opacity={0.5}>{lbl}</text>
-            ))}
-
-            {/* Connections */}
-            {conns.map((c, i) => {
-              const fl = getNodeLevel(data.levels, c.from.id, path).level;
-              const tl = getNodeLevel(data.levels, c.to.id, path).level;
-              const active = fl > 0 && tl > 0;
-              const avail = fl > 0 && getPrereqs(c.to).every(pid => getNodeLevel(data.levels, pid, path).level >= 1);
+          {/* Tier tabs */}
+          <div style={{ display: "flex", gap: 8, padding: "10px 24px", overflowX: "auto" }}>
+            {diffs.map(d => {
+              const tt = tierTheme(d.id);
+              const isActive = activeTierId === d.id;
+              const hasSkills = roleNodes.some(n => n.difficulty_id === d.id);
               return (
-                <path key={i}
-                  d={bezier(c.from.canvas_x, c.from.canvas_y, c.to.canvas_x, c.to.canvas_y, R)}
-                  stroke={active ? col : avail ? col + "55" : "#1a1a3e"}
-                  strokeWidth={active ? 2.5 : 1.5}
-                  fill="none"
-                  strokeDasharray={active ? "none" : "5,4"}
-                  opacity={active ? 0.9 : avail ? 0.5 : 0.3}
-                />
+                <button key={d.id} onClick={() => hasSkills && scrollToTier(d.id)}
+                  style={{
+                    padding: "6px 18px", borderRadius: BR.pill, fontFamily: F.display, fontSize: 11,
+                    fontWeight: 700, letterSpacing: 1, cursor: hasSkills ? "pointer" : "not-allowed",
+                    background: isActive ? tt.accent : "transparent",
+                    color: isActive ? "#fff" : hasSkills ? C.text2 : C.muted,
+                    border: `1px solid ${isActive ? tt.accent : C.border}`,
+                    opacity: hasSkills ? 1 : 0.4, transition: "all 0.2s", whiteSpace: "nowrap",
+                    boxShadow: isActive ? `0 2px 12px ${tt.accent}44` : "none",
+                  }}
+                >
+                  {!hasSkills && "🔒 "}{d.short_label} — {d.label}
+                </button>
               );
             })}
+          </div>
+        </div>
 
-            {/* Nodes */}
-            {nodes.map(node => {
-              const nl = getNodeLevel(data.levels, node.id, path);
-              const st = nodeState(data.levels, node, path);
-              const isSel = selNode?.id === node.id;
-              const un = st !== "locked";
-              const shared = getShared(node);
-              const isShared = shared.length > 1;
+        {/* Scrollable tier canvas */}
+        <div ref={scrollRef} style={{ flex: 1, overflowY: "auto", position: "relative", background: C.bg, scrollBehavior: "smooth" }}>
 
-              // Fill intensity from mastery (0–100 → hex)
-              const fillHex = () => {
-                if (st === "locked") return "#07071a";
-                if (st === "maxed") return "#1a1200";
-                const h = Math.max(14, Math.round((nl.level / MAX_LEVEL) * 90));
-                return `${col}${h.toString(16).padStart(2, "0")}`;
-              };
-              const borderCol = () => {
-                if (st === "locked") return "#1e1e3c";
-                if (st === "maxed") return "#ffd700";
-                return col;
-              };
-
-              return (
-                <g key={`${node.path_id}-${node.id}`}
-                  className={`skill-node${!un ? " locked" : ""}`}
-                  style={{ cursor: un ? "pointer" : "not-allowed" }}
-                  onClick={() => un && setSelNode(isSel ? null : node)}>
-
-                  {isSel && <circle cx={node.canvas_x} cy={node.canvas_y} r={R + 11} fill="none" stroke={col} strokeWidth={1.5} opacity={0.25} />}
-                  {isShared && <circle cx={node.canvas_x} cy={node.canvas_y} r={R + 5} fill="none" stroke="#ffc107" strokeWidth={1.5} strokeDasharray="4,3" opacity={0.65} />}
-                  {st === "available" && <circle cx={node.canvas_x} cy={node.canvas_y} r={R + 2} fill="none" stroke={col} strokeWidth={1.2} opacity={0.45} strokeDasharray="3,4" style={{ animation: "nf-pulse 2s ease-in-out infinite" }} />}
-
-                  <circle cx={node.canvas_x} cy={node.canvas_y} r={R}
-                    fill={fillHex()} stroke={borderCol()} strokeWidth={isSel ? 3 : 2} opacity={un ? 1 : 0.35} />
-
-                  {/* Mastery arc (0–MAX_LEVEL) */}
-                  {nl.level > 0 && (
-                    <path d={levelArc(node.canvas_x, node.canvas_y, R - 5, nl.level / MAX_LEVEL)}
-                      stroke={st === "maxed" ? "#ffd700" : col} strokeWidth={3} fill="none" strokeLinecap="round" opacity={0.95} />
-                  )}
-
-                  <text x={node.canvas_x} y={node.canvas_y} textAnchor="middle" dominantBaseline="middle" fontSize={un ? 15 : 12} opacity={un ? 1 : 0.25}>
-                    {!un ? "🔒" : node.icon}
-                  </text>
-
-                  {nl.level > 0 && (
-                    <text x={node.canvas_x} y={node.canvas_y + R - 7} textAnchor="middle" fontSize={8}
-                      fontFamily={F.mono} fontWeight="bold" fill={st === "maxed" ? "#ffd700" : col}>
-                      {nl.level === MAX_LEVEL ? "MAX" : `${nl.level}/${MAX_LEVEL}`}
-                    </text>
-                  )}
-
-                  {/* Mastery % badge */}
-                  {un && nl.avg_mastery > 0 && (
-                    <text x={node.canvas_x} y={node.canvas_y + R + 29} textAnchor="middle" fontSize={7.5}
-                      fontFamily={F.mono} fill={C.muted} opacity={0.7}>
-                      {Math.round(nl.avg_mastery)}%
-                    </text>
-                  )}
-
-                  {st === "available" && (
-                    <g>
-                      <circle cx={node.canvas_x + R - 1} cy={node.canvas_y - R + 1} r={9} fill="#0d0d23" stroke={C.purple} strokeWidth={1.5} />
-                      <text x={node.canvas_x + R - 1} y={node.canvas_y - R + 2} textAnchor="middle" dominantBaseline="middle" fontSize={8} fill={C.purple} fontFamily={F.mono}>1</text>
-                    </g>
-                  )}
-
-                  {st === "maxed" && (
-                    <text x={node.canvas_x + R} y={node.canvas_y - R + 4} textAnchor="middle" fontSize={11}>⭐</text>
-                  )}
-
-                  {isShared && shared.filter(p => p !== path).map((p, bi) => (
-                    <g key={p}>
-                      <rect x={node.canvas_x - R + 4 + bi * 17} y={node.canvas_y + R + 5} width={14} height={10} rx={2}
-                        fill={`${PATH_COL[p]}22`} stroke={PATH_COL[p]} strokeWidth={1} />
-                      <text x={node.canvas_x - R + 11 + bi * 17} y={node.canvas_y + R + 12} textAnchor="middle" fontSize={7}
-                        fill={PATH_COL[p]} fontFamily={F.mono} fontWeight="bold">{PATH_LBL[p]}</text>
-                    </g>
-                  ))}
-
-                  <text x={node.canvas_x} y={node.canvas_y + R + (isShared ? 26 : 22)} textAnchor="middle"
-                    fontSize={10} fill={un ? C.text : C.muted} fontFamily={F.display} fontWeight={600}>
-                    {node.name}
-                  </text>
-                </g>
-              );
-            })}
+          {/* SVG lines layer */}
+          <svg style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%", pointerEvents: "none", zIndex: 1 }}>
+            {lines.map((l, i) => (
+              <path key={i} d={l.path} stroke={l.met ? C.muted : `${C.muted}44`} strokeWidth={2.5}
+                fill="none" strokeLinecap="round" strokeLinejoin="round"
+                strokeDasharray={l.met ? "none" : "6 6"} opacity={0.7} />
+            ))}
           </svg>
-        </div>
 
-        {/* ── Detail panel ────────────────────────────────────────────────── */}
-        <div style={{ width: 248, flexShrink: 0, ...col_(12) }}>
-          {sn && snNL ? (
-            <div style={card(col)}>
-              {/* Icon + title */}
-              <div style={{ textAlign: "center", padding: "14px 0 12px" }}>
-                <div style={{ fontSize: 42, marginBottom: 8, filter: snSt === "locked" ? "grayscale(1)" : "none" }}>
-                  {snSt !== "locked" ? sn.icon : "🔒"}
-                </div>
-                <div style={{ fontFamily: F.display, fontSize: 17, fontWeight: 700, color: col, marginBottom: 6 }}>{sn.name}</div>
-                <div style={{ ...row(4), justifyContent: "center", flexWrap: "wrap" }}>
-                  {snSh.map(p => <span key={p} style={{ ...tag(PATH_COL[p], true) as object, fontSize: 9 }}>{PATH_LBL[p]}</span>)}
-                </div>
-              </div>
+          {/* Tier sections */}
+          <div style={{ position: "relative", zIndex: 2, maxWidth: 900, margin: "0 auto", padding: "0 24px 160px" }}>
+            {diffs.map(d => {
+              const tierSkills = roleNodes.filter(n => n.difficulty_id === d.id);
+              const tt = tierTheme(d.id);
+              const tierLocked = !tierSkills.some(sk => isUnlocked(sk)) && !freeMode;
 
-              {/* Mastery summary */}
-              <div style={{ background: `${col}0d`, borderRadius: 8, padding: "10px 12px", marginBottom: 12 }}>
-                <div style={{ ...row(), justifyContent: "space-between", marginBottom: 5 }}>
-                  <span style={h3}>Level {snLv}/{MAX_LEVEL}</span>
-                  <span style={{ fontFamily: F.mono, fontSize: 11, color: col }}>{Math.round(snNL.avg_mastery)}% avg</span>
-                </div>
-                {/* Level pips (5) */}
-                <div style={{ display: "flex", gap: 4 }}>
-                  {Array.from({ length: MAX_LEVEL }).map((_, i) => (
-                    <div key={i} style={{
-                      flex: 1, height: 6, borderRadius: 3,
-                      background: i < snLv ? (snSt === "maxed" ? "#ffd700" : col) : C.border,
-                      boxShadow: i < snLv ? `0 0 5px ${col}88` : "none",
-                      transition: "all 0.25s",
-                    }} />
-                  ))}
-                </div>
-                <div style={{ ...mono(9), marginTop: 5, display: "flex", justifyContent: "space-between" }}>
-                  <span>{snNL.mastered_subtopics} subtopics mastered</span>
-                  <span style={{ color: C.gold }}>{snNL.xp_invested} XP invested</span>
-                </div>
-              </div>
+              return (
+                <div key={d.id} id={d.id} ref={el => { tierRefs.current[d.id] = el; }}
+                  style={{
+                    padding: "48px 0", margin: "16px 0", position: "relative",
+                    opacity: tierLocked ? 0.35 : 1, filter: tierLocked ? "grayscale(0.5)" : "none",
+                    transition: "all 0.4s",
+                  }}
+                >
+                  {/* Tier background */}
+                  <div style={{
+                    position: "absolute", inset: 0, borderRadius: 32,
+                    background: tt.bg, border: `1px solid ${tt.border}`,
+                    pointerEvents: "none",
+                  }} />
 
-              {/* Panel tabs */}
-              <div style={{ ...row(0), marginBottom: 10, borderRadius: 7, overflow: "hidden", border: `1px solid ${C.border}` }}>
-                {(["subtopics", "resources"] as const).map(tab => (
-                  <button key={tab} onClick={() => setPanel(tab)} style={{
-                    flex: 1, padding: "6px 0", background: panel === tab ? `${col}22` : "transparent",
-                    border: "none", cursor: "pointer", fontFamily: F.display, fontSize: 10,
-                    color: panel === tab ? col : C.muted, fontWeight: 700, letterSpacing: 1, textTransform: "uppercase",
-                    transition: "all 0.15s",
-                  }}>
-                    {tab === "subtopics" ? "🧩 Topics" : "📚 Resources"}
-                  </button>
-                ))}
-              </div>
+                  {/* Tier label */}
+                  <div style={{ position: "relative", textAlign: "center", marginBottom: 32 }}>
+                    <span style={{
+                      fontFamily: F.display, fontSize: 11, fontWeight: 700, letterSpacing: 3,
+                      textTransform: "uppercase", color: tt.accent,
+                      background: C.bg, padding: "4px 16px", borderRadius: BR.pill,
+                      border: `1px solid ${tt.border}`,
+                    }}>
+                      {d.short_label} — {d.label}
+                    </span>
+                  </div>
 
-              {/* Subtopics panel */}
-              {panel === "subtopics" && (
-                <div style={col_(0)}>
-                  {subtopics.length > 0
-                    ? subtopics.map(sub => <SubtopicBar key={sub.id} sub={sub} />)
-                    : (
-                      <div style={{ fontFamily: F.body, fontSize: 11, color: C.muted, textAlign: "center", padding: "12px 0" }}>
-                        No subtopics loaded
+                  {/* Skill nodes */}
+                  <div style={{ position: "relative", display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "48px 56px" }}>
+                    {tierSkills.length === 0 && (
+                      <div style={{ padding: "32px 24px", border: `2px dashed ${C.border}`, borderRadius: 24, color: C.muted, fontFamily: F.body, fontSize: 13 }}>
+                        Empty tier region
                       </div>
-                    )
-                  }
-                </div>
-              )}
+                    )}
+                    {tierSkills.map(sk => {
+                      const nl = getNodeLevel(levels, sk.id, activeRole);
+                      const done = nl.mastered_subtopics;
+                      const total = sk.item_count || 1;
+                      const pct = Math.round((done / total) * 100);
+                      const un = isUnlocked(sk);
+                      const locked = !un && nl.level === 0;
+                      const maxed = pct >= 100;
 
-              {/* Resources panel */}
-              {panel === "resources" && (
-                <div>
-                  {resources.length > 0
-                    ? resources.map(r => <ResourceItem key={r.id} res={r} />)
-                    : (
-                      <div style={{ fontFamily: F.body, fontSize: 11, color: C.muted, textAlign: "center", padding: "12px 0" }}>
-                        No resources for this node
-                      </div>
-                    )
-                  }
-                </div>
-              )}
+                      // Squircle colours
+                      const outerBg = maxed
+                        ? `linear-gradient(135deg, ${C.gold}88, ${C.gold})`
+                        : nl.level > 0
+                          ? `linear-gradient(135deg, ${col}66, ${col})`
+                          : C.surface;
+                      const innerBg = nl.level > 0
+                        ? `linear-gradient(135deg, ${col}, ${C.accentEnd})`
+                        : C.surface2;
 
-              {/* Description */}
-              <p style={{ fontFamily: F.body, fontSize: 11, lineHeight: 1.75, color: C.text2, margin: "14px 0" }}>
-                {sn.description}
-              </p>
-
-              {/* Prerequisites */}
-              {snPre.length > 0 && (
-                <div style={{ marginBottom: 14 }}>
-                  <div style={h3}>Requires</div>
-                  <div style={{ ...col_(4), marginTop: 5 }}>
-                    {snPre.map(pid => {
-                      const pn = nodeMap[pid];
-                      const met = getNodeLevel(data.levels, pid, path).level >= 1;
                       return (
-                        <div key={pid} style={{ ...row(6), fontFamily: F.body, fontSize: 11, color: met ? C.green : C.muted }}>
-                          <span>{met ? "✓" : "✗"}</span>
-                          <span>{pn?.name ?? pid}</span>
-                          {met && <span style={{ fontFamily: F.mono, fontSize: 9, color: C.green, marginLeft: "auto" }}>Lv.{getNodeLevel(data.levels, pid, path).level}</span>}
+                        <div key={sk.id} ref={el => { nodeRefs.current[sk.id] = el; }}
+                          className={`skill-node${locked ? " locked" : ""}`}
+                          onClick={() => !locked && setDetailId(sk.id)}
+                          style={{
+                            display: "flex", flexDirection: "column", alignItems: "center",
+                            cursor: locked ? "not-allowed" : "pointer",
+                            opacity: locked ? 0.45 : 1, transition: "all 0.25s",
+                            filter: locked ? "grayscale(0.5)" : "none",
+                          }}
+                        >
+                          {/* Squircle node */}
+                          <div style={{
+                            position: "relative", width: NODE_SIZE, height: NODE_SIZE, borderRadius: 32,
+                            display: "flex", alignItems: "center", justifyContent: "center", padding: 5,
+                            background: outerBg, boxShadow: maxed ? `0 8px 24px ${C.gold}44` : nl.level > 0 ? `0 6px 20px ${col}33` : SHADOW.card,
+                            transition: "all 0.3s",
+                          }}>
+                            {/* Inner circle */}
+                            <div style={{
+                              width: "100%", height: "100%", borderRadius: 28,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              background: innerBg, position: "relative", overflow: "hidden",
+                            }}>
+                              <span style={{ fontSize: 36, filter: nl.level > 0 ? "drop-shadow(0 2px 4px rgba(0,0,0,0.3))" : "none", opacity: locked ? 0.4 : 1 }}>
+                                {sk.icon || "•"}
+                              </span>
+                              {nl.level > 0 && (
+                                <div style={{ position: "absolute", inset: 0, background: "linear-gradient(135deg, transparent 30%, rgba(255,255,255,0.15) 100%)", pointerEvents: "none" }} />
+                              )}
+                            </div>
+
+                            {/* Progress badge */}
+                            <div style={{
+                              position: "absolute", top: -10, left: "50%", transform: "translateX(-50%)",
+                              padding: "2px 10px", borderRadius: BR.pill, fontSize: 10, fontWeight: 800,
+                              fontFamily: F.mono, letterSpacing: 0.5, zIndex: 5,
+                              background: maxed ? C.gold : nl.level > 0 ? col : C.surface2,
+                              color: maxed || nl.level > 0 ? "#fff" : C.muted,
+                              border: `2px solid ${C.bg}`,
+                              boxShadow: "0 2px 8px rgba(0,0,0,0.3)",
+                            }}>
+                              {done}/{total}
+                            </div>
+
+                            {/* Level up button (spend SP) */}
+                            {!locked && !maxed && (
+                              <button
+                                onClick={e => { e.stopPropagation(); levelUpSkill(sk.id, activeRole); }}
+                                style={{
+                                  position: "absolute", top: "50%", right: -12, transform: "translateY(-50%)",
+                                  width: 26, height: 26, borderRadius: 10, border: `2px solid ${C.bg}`,
+                                  background: freeMode ? C.gold : col, color: "#fff",
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  cursor: "pointer", fontSize: 14, fontWeight: 700, lineHeight: 1,
+                                  boxShadow: "0 2px 8px rgba(0,0,0,0.3)", transition: "all 0.15s", zIndex: 10,
+                                }}
+                                title="Spend 1 SP to boost mastery"
+                              >+</button>
+                            )}
+                          </div>
+
+                          {/* Label */}
+                          <div style={{
+                            marginTop: 12, padding: "6px 14px", borderRadius: 12,
+                            background: C.bgAcrylic, backdropFilter: "blur(8px)",
+                            border: `1px solid ${C.border}`,
+                            maxWidth: 160, minWidth: 100, textAlign: "center",
+                            boxShadow: SHADOW.card,
+                          }}>
+                            <div style={{ fontFamily: F.display, fontSize: 11, fontWeight: 700, color: C.text, lineHeight: 1.3, marginBottom: 3 }}>
+                              {sk.name}
+                            </div>
+                            <div style={{ fontFamily: F.mono, fontSize: 9, color: C.muted, fontWeight: 700 }}>
+                              Lv {nl.level}/{sk.topic_count || 1}
+                            </div>
+                          </div>
                         </div>
                       );
                     })}
                   </div>
                 </div>
-              )}
+              );
+            })}
+          </div>
+        </div>
+      </div>
 
-              {/* Action buttons */}
-              {/* Action buttons */}
-              {snSt !== "locked" && (
-                <div style={col_(8)}>
-                  {/* Practice via AI (Always available if unlocked) */}
-                  <button className="nf-btn"
-                    onClick={() => api.llmPractice(sn.id, "medium")}
-                    style={{
-                      width: "100%", padding: "10px", borderRadius: 9,
-                      fontFamily: F.display, fontSize: 12, fontWeight: 700, letterSpacing: 1.2, textTransform: "uppercase",
-                      border: `2px solid ${col}`, background: `${col}15`, color: col, cursor: "pointer",
-                      display: "flex", alignItems: "center", justifyContent: "center", gap: 8
-                    }}>
-                    🧠 Practice this skill
-                  </button>
+      {/* ── COL 3: Summary Panel (right) ─────────────────────────────── */}
+      <div style={{
+        width: 220, flexShrink: 0, borderLeft: `1px solid ${C.border}`,
+        background: C.surface, display: "flex", flexDirection: "column", alignItems: "center",
+        padding: "24px 16px", gap: 20, overflowY: "auto",
+      }}>
+        {/* Role badge card */}
+        <div style={{
+          width: "100%", background: C.surface3, borderRadius: 24, padding: "28px 16px",
+          display: "flex", flexDirection: "column", alignItems: "center", gap: 16,
+          border: `1px solid ${C.border}`, boxShadow: SHADOW.card,
+        }}>
+          <span style={{ fontFamily: F.mono, fontSize: 9, fontWeight: 700, letterSpacing: 2, color: C.muted, textTransform: "uppercase" }}>
+            {roles.find(r => r.id === activeRole)?.name || "—"}
+          </span>
 
-                  {/* SP boost (Hidden if Maxed) */}
-                  {snLv < MAX_LEVEL ? (
-                    <button className="nf-btn"
-                      disabled={sp < 1 || boosting}
-                      onClick={handleBoost}
-                      style={{
-                        width: "100%", padding: "10px", borderRadius: 9,
-                        // ... rest of your boost button styles
-                      }}>
-                      {boosting ? "Boosting…" : sp >= 1 ? "⬡ SP Boost (+15 mastery) — 1 SP" : "⬡ Need More SP"}
-                    </button>
-                  ) : (
-                    <div style={{ textAlign: "center", padding: 10, fontFamily: F.display, fontSize: 13, color: "#ffd700", fontWeight: 700, letterSpacing: 1 }}>
-                      ⭐ SKILL MASTERED ⭐
-                    </div>
-                  )}
-                </div>
-              )}
+          {/* Circular icon */}
+          <div style={{
+            width: 72, height: 72, borderRadius: 24, display: "flex", alignItems: "center", justifyContent: "center",
+            background: `linear-gradient(135deg, ${col}, ${C.accentEnd})`,
+            border: `3px solid ${C.text}`, boxShadow: `0 8px 24px ${col}44`,
+            fontSize: 32, color: "#fff", fontWeight: 700,
+          }}>
+            {roles.find(r => r.id === activeRole)?.name?.charAt(0) || "?"}
+          </div>
 
-              {/* Locked state message */}
-              {snSt === "locked" && (
-                <div style={{ textAlign: "center", padding: 10, fontFamily: F.body, fontSize: 11, color: C.muted }}>
-                  Unlock prerequisites first.
-                </div>
-              )}
-            </div>
-          ) : (
-            <div style={{ ...card(), padding: 28, textAlign: "center" }}>
-              <div style={{ fontSize: 36, marginBottom: 14 }}>🌐</div>
-              <div style={{ fontFamily: F.body, fontSize: 13, color: C.muted, lineHeight: 1.7 }}>
-                Click an <span style={{ color: col }}>unlocked node</span> to inspect subtopics, practice, and level up.
-              </div>
-              <div style={{ ...mono(10), marginTop: 14 }}>
-                <span style={{ color: C.purple }}>{sp} SP</span> available
-              </div>
-            </div>
-          )}
+          <span style={{ fontFamily: F.mono, fontSize: 9, color: C.muted, letterSpacing: 2, textTransform: "uppercase" }}>
+            Skill Progression
+          </span>
 
-          {/* Path summary */}
-          <div style={card()}>
-            <div style={h3}>Path Progress</div>
-            <div style={{ fontFamily: F.mono, fontSize: 26, color: col, fontWeight: 700, margin: "6px 0" }}>{prog}%</div>
-            <div style={bar}><div style={fill(prog, col)} className="nf-bar-fill" /></div>
-            <div style={{ ...mono(10), marginTop: 8 }}>
-              {nodes.filter(n => n.path_id === path && getNodeLevel(data.levels, n.id, path).level > 0).length}/{nodes.filter(n => n.path_id === path).length} skills started
-            </div>
-            <div style={mono(10)}>
-              {nodes.filter(n => n.path_id === path && getNodeLevel(data.levels, n.id, path).level >= MAX_LEVEL).length} mastered
-            </div>
-            <div style={{ marginTop: 12, borderTop: `1px solid ${C.border}`, paddingTop: 10, fontFamily: F.mono, fontSize: 9, color: C.muted, lineHeight: 2 }}>
-              <span style={{ color: C.gold }}>EARN MASTERY</span><br />
-              Practice problems → +8 mastery<br />
-              SR review (quality 5) → +6 mastery<br />
-              Grind session → up to +20 mastery<br />
-              SP boost → +15 all subtopics
+          {/* Progress ring */}
+          <div style={{ position: "relative", width: 120, height: 120 }}>
+            <svg width={120} height={120} style={{ transform: "rotate(-90deg)" }}>
+              <circle cx={60} cy={60} r={50} fill="none" stroke={`${C.border}44`} strokeWidth={10} />
+              <circle cx={60} cy={60} r={50} fill="none"
+                stroke={col} strokeWidth={10} strokeLinecap="round"
+                strokeDasharray={314} strokeDashoffset={314 - 314 * (pathProgress / 100)}
+                style={{ transition: "stroke-dashoffset 0.8s ease" }}
+              />
+            </svg>
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontFamily: F.mono, fontSize: 24, fontWeight: 800, color: C.text }}>{pathProgress}</span>
+              <span style={{ fontFamily: F.mono, fontSize: 9, color: C.muted }}>/ 100%</span>
             </div>
           </div>
+        </div>
+
+        {/* Stats */}
+        <div style={{ width: "100%", ...col_(8) }}>
+          {[
+            { label: "Subtopics Done", value: totalSpent },
+            { label: "Skills", value: roleNodes.length },
+            { label: "Tiers", value: diffs.length },
+          ].map(s => (
+            <div key={s.label} style={{ ...row(8), justifyContent: "space-between", padding: "6px 0", borderBottom: `1px solid ${C.border}` }}>
+              <span style={{ ...mono(10, C.muted) }}>{s.label}</span>
+              <span style={{ ...mono(12, C.text), fontWeight: 700 }}>{s.value}</span>
+            </div>
+          ))}
         </div>
       </div>
     </div>
   );
 }
-
-type Props = Pick<UseGameState, "user" | "skillNodes" | "loadSkillPath" | "levelUpSkill">;
