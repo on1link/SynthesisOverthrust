@@ -6,14 +6,16 @@ use sqlx::FromRow;
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]
 pub struct User {
-    pub id:           String,
-    pub username:     String,
-    pub xp:           i64,
-    pub level:        i64,
-    pub sp:           i64,
-    pub streak:       i64,
-    pub active_paths: String,   // JSON array
-    pub last_active:  Option<String>,
+    pub id:              String,
+    pub name:            String,
+    pub xp:              i64,
+    pub level:           i64,
+    pub sp:              i64,
+    pub streak:          i64,
+    pub last_active:     Option<String>,
+    pub timezone:        String,
+    pub daily_xp_goal:   i64,
+    pub onboarding_done: i64,
 }
 
 #[derive(Debug, Serialize, Deserialize, FromRow)]

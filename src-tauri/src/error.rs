@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src-tauri/src/error.rs
+// SynthesisOverthrust — src-tauri/src/error.rs
 // Unified error type. All #[tauri::command] handlers return Result<T, NfError>.
 // NfError implements serde::Serialize so Tauri can send it to the frontend.
 // ============================================================
