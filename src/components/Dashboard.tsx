@@ -5,7 +5,7 @@
 
 import React, { useState } from "react";
 import type { UseGameState } from "../hooks/useGameState";
-import { C, F, bar, btn, card, col_, fill, glassCard, grid, h1, h2, mono, row, tag } from "../tokens";
+import { C, F, BR, bar, btn, card, col_, fill, glassCard, grid, h1, h2, mono, row, tag } from "../tokens";
 
 const XP_PER_LVL = 1000;
 const PATH_META: Record<string, { col: string; icon: string; label: string }> = {
@@ -90,7 +90,7 @@ export default function Dashboard({
         <div style={row(20)}>
           {/* Avatar */}
           <div style={{
-            width: 68, height: 68, borderRadius: 16, flexShrink: 0,
+            width: 68, height: 68, borderRadius: BR.lg, flexShrink: 0,
             background: `${C.accent}18`,
             border: `2px solid ${C.accent}55`,
             display: "flex", alignItems: "center", justifyContent: "center",
@@ -143,7 +143,7 @@ export default function Dashboard({
 
           {addOpen && (
             <div style={{
-              background: C.surface2, borderRadius: 10, padding: 14,
+              background: C.surface2, borderRadius: BR.sm, padding: 14,
               marginBottom: 14, border: `1px solid ${C.border}`,
               animation: "nf-fadein 0.15s ease",
             }}>
@@ -151,7 +151,7 @@ export default function Dashboard({
                 autoFocus
                 style={{
                   background: C.surface, border: `1px solid ${C.border2}`,
-                  borderRadius: 7, padding: "9px 13px",
+                  borderRadius: BR.sm, padding: "9px 13px",
                   color: C.text, fontFamily: F.body, fontSize: 14,
                   outline: "none", width: "100%", boxSizing: "border-box", marginBottom: 10,
                 }}
@@ -163,7 +163,7 @@ export default function Dashboard({
               <div style={{ ...row(8), flexWrap: "wrap" }}>
                 <select style={{
                   background: C.surface, border: `1px solid ${C.border}`,
-                  borderRadius: 7, padding: "7px 10px",
+                  borderRadius: BR.sm, padding: "7px 10px",
                   color: C.text, fontFamily: F.body, fontSize: 13,
                   cursor: "pointer", flex: 1, minWidth: 80,
                 }}
@@ -172,7 +172,7 @@ export default function Dashboard({
                 </select>
                 <select style={{
                   background: C.surface, border: `1px solid ${C.border}`,
-                  borderRadius: 7, padding: "7px 10px",
+                  borderRadius: BR.sm, padding: "7px 10px",
                   color: C.text, fontFamily: F.body, fontSize: 13,
                   cursor: "pointer", flex: 1, minWidth: 80,
                 }}
@@ -199,7 +199,7 @@ export default function Dashboard({
               <div key={t.id}
                 className="nf-card-hover"
                 style={{
-                  ...row(), padding: "10px 14px", borderRadius: 9,
+                  ...row(), padding: "10px 14px", borderRadius: BR.sm,
                   background: t.done ? `${C.green}0a` : C.surface2,
                   border: `1px solid ${t.done ? C.green + "30" : C.border}`,
                   opacity: t.done ? 0.55 : 1,
@@ -209,12 +209,12 @@ export default function Dashboard({
                 <button
                   onClick={() => !t.done && completeTask(t.id)}
                   style={{
-                    width: 22, height: 22, borderRadius: 6, flexShrink: 0,
+                    width: 22, height: 22, borderRadius: BR.sm, flexShrink: 0,
                     border: `2px solid ${t.done ? C.green : C.muted}`,
                     background: t.done ? `${C.green}25` : "transparent",
                     cursor: t.done ? "default" : "pointer",
                     display: "flex", alignItems: "center", justifyContent: "center",
-                    transition: "all 0.15s ease", padding: 0,
+                    transition: "all 0.15s ease", padding: 10,
                   }}>
                   {t.done && <span style={{ color: C.green, fontSize: 13, fontWeight: 700 }}>✓</span>}
                 </button>

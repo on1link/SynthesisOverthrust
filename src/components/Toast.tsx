@@ -4,7 +4,7 @@
 // ============================================================
 
 import type { Toast as ToastData } from "../hooks/useGameState";
-import { C, F } from "../tokens";
+import { BR, C, F } from "../tokens";
 
 const TYPE_STYLE: Record<string, { bg: string; border: string; icon: string }> = {
   xp: { bg: C.surface, border: C.accent, icon: "⚡" },
@@ -31,7 +31,7 @@ export default function ToastStack({ toasts }: Props) {
             alignItems: "center",
             gap: 10,
             padding: "11px 18px",
-            borderRadius: 10,
+            borderRadius: BR.md,
             background: s.bg,
             border: `1px solid ${s.border}66`,
             boxShadow: `0 4px 24px rgba(0,0,0,0.7), 0 0 16px ${s.border}33`,
@@ -52,7 +52,7 @@ export default function ToastStack({ toasts }: Props) {
               <div style={{
                 position: "absolute",
                 inset: 0,
-                borderRadius: 10,
+                borderRadius: BR.md,
                 background: `linear-gradient(90deg, transparent, ${C.gold}22, transparent)`,
                 animation: "nf-shimmer 1s linear infinite",
                 pointerEvents: "none",

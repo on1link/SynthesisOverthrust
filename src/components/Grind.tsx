@@ -6,7 +6,7 @@
 import React, { useEffect, useState } from "react";
 import type { UseGameState } from "../hooks/useGameState";
 import {
-  C, F, card,
+  BR, C, F, card,
   col_,
   glassCard,
   grid,
@@ -42,7 +42,7 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
 
   useEffect(() => { loadSessions(activePlat.id); }, [activePlat.id]);
 
-  const platSessions = sessions[activePlat.id] ?? [];
+  const platSessions = sessions.filter(s => s.platform === activePlat.id);
   const xpReward = XP_MAP[diff] ?? 60;
 
   const handleLog = async () => {
@@ -73,14 +73,14 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
         {PLATFORMS.map(p => {
           const active = activePlat.id === p.id;
-          const cnt = (sessions[p.id] ?? []).length;
+          const cnt = sessions.filter(s => s.platform === p.id).length;
           return (
             <button key={p.id}
               className="nf-btn"
               onClick={() => setActivePlat(p)}
               style={{
                 padding: "10px 14px",
-                borderRadius: 10,
+                borderRadius: BR.md,
                 border: `1.5px solid ${active ? p.col : C.border}`,
                 background: active ? `${p.col}18` : C.surface2,
                 cursor: "pointer",
@@ -101,7 +101,7 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
                 <span style={{
                   position: "absolute", top: -5, right: -5,
                   ...tag(p.col, true),
-                  fontSize: 9, borderRadius: 99,
+                  fontSize: 9, borderRadius: BR.pill,
                   padding: "0px 5px",
                 }}>
                   {cnt}
@@ -161,7 +161,7 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
                       style={{
                         flex: 1,
                         padding: "9px 0",
-                        borderRadius: 8,
+                        borderRadius: BR.sm,
                         border: `1.5px solid ${diff === d ? dc : C.border}`,
                         background: diff === d ? `${dc}22` : "transparent",
                         color: diff === d ? dc : C.muted,
@@ -199,7 +199,7 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
             {/* XP preview */}
             <div style={{
               ...row(), justifyContent: "space-between",
-              background: C.surface2, borderRadius: 9,
+              background: C.surface2, borderRadius: BR.md,
               padding: "10px 14px",
               border: `1px solid ${C.border}`,
             }}>
@@ -216,7 +216,7 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
               disabled={!topic.trim() || logging}
               style={{
                 padding: "13px",
-                borderRadius: 9,
+                borderRadius: BR.md,
                 border: `2px solid ${topic.trim() ? activePlat.col : C.border}`,
                 background: topic.trim() ? `${activePlat.col}22` : C.surface2,
                 color: topic.trim() ? activePlat.col : C.muted,
@@ -253,31 +253,26 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
           ) : (
             <div style={{ ...col_(6), maxHeight: 440, overflowY: "auto", paddingRight: 4 }}>
               {platSessions.map(s => {
-                const dc = { Easy: C.green, Medium: C.gold, Hard: C.red }[s.difficulty] ?? C.gold;
+                const dc = (s.difficulty ? { Easy: C.green, Medium: C.gold, Hard: C.red }[s.difficulty] : undefined) ?? C.gold;
                 return (
                   <div key={s.id}
                     className="nf-card-hover"
                     style={{
                       padding: "11px 14px",
-                      borderRadius: 9,
+                      borderRadius: BR.md,
                       background: C.surface2,
                       border: `1px solid ${C.border}`,
                       "--hover-col": activePlat.col,
                     } as React.CSSProperties}>
                     <div style={{ ...row(), justifyContent: "space-between", marginBottom: 4 }}>
                       <span style={{ fontFamily: F.display, fontSize: 14, fontWeight: 600, color: C.text }}>
-                        {s.topic}
+                        {s.problems_solved} problems · {s.duration_mins}m
                       </span>
                       <div style={row(5)}>
                         <span style={tag(dc, true)}>{s.difficulty}</span>
                         <span style={tag(C.gold, true)}>+{s.xp_reward}</span>
                       </div>
                     </div>
-                    {s.notes && (
-                      <p style={{ fontFamily: F.body, fontSize: 11, color: C.muted, margin: "5px 0 0", lineHeight: 1.6 }}>
-                        {s.notes}
-                      </p>
-                    )}
                     <div style={{ ...mono(9, C.muted), marginTop: 5 }}>
                       {new Date(s.created_at).toLocaleDateString("en-US", {
                         month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
