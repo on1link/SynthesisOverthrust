@@ -24,15 +24,15 @@ use once_cell::sync::OnceCell;
 use sqlx::SqlitePool;
 use std::path::PathBuf;
 use tauri::{
-    menu::{Menu, MenuItem},
-    tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
     AppHandle,
     Emitter,
     Manager,
     RunEvent, // 🐛 FIX: Importamos Emitter y RunEvent para el manejo de apagado
+    menu::{Menu, MenuItem},
+    tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent},
 };
 use tracing::info;
-use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt, EnvFilter}; // Brings in the 1-argument Result // Brings in the 1-argument Result
+use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt}; // Brings in the 1-argument Result // Brings in the 1-argument Result
 /// Global DB pool — set once on startup, shared via Tauri State.
 pub static DB: OnceCell<SqlitePool> = OnceCell::new();
 
@@ -87,8 +87,9 @@ fn setup_tray(app: &AppHandle) -> tauri::Result<TrayIcon> {
 // ── Main ─────────────────────────────────────────────────────────────────────
 fn main() {
     #[cfg(target_os = "linux")]
-    std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
-
+    unsafe {
+        std::env::set_var("WEBKIT_DISABLE_DMABUF_RENDERER", "1");
+    }
     // Structured logging — RUST_LOG env var, default info
     tracing_subscriber::registry()
         .with(fmt::layer().with_target(false))
@@ -141,12 +142,11 @@ fn main() {
                 info!("SQLite connected: {}", db_path.display());
 
                 // Run all migrations (001 → 003)
-                //  db::run_migrations(&pool).await.expect("migrations failed");
-                //  info!("Migrations applied");
+                db::run_migrations(&pool).await.expect("migrations failed");
+                info!("Migrations applied");
                 handle.manage(db::DbPool(pool.clone())); // Store pool in Tauri state
 
                 // Seed skill nodes if empty
-                db::seed_skill_nodes(&pool).await.expect("seed failed");
 
                 // ── System tray ───────────────────────────────────────────────
                 setup_tray(&handle).expect("tray setup failed");
@@ -202,51 +202,53 @@ fn main() {
 
             Ok(())
         })
-        // ── IPC command handlers — all three phases ───────────────────────────
+        // ── IPC command handlers ─────────────────────────────────────────────
         .invoke_handler(tauri::generate_handler![
-            // ... (Tus comandos Phase 1, 2 y 3 quedan exactamente igual)
+            // ── User ────────────────────────────────────────────────────────
             commands::get_user,
             commands::update_streak,
+            // ── Skills ──────────────────────────────────────────────────────
             commands::get_skill_levels,
             commands::level_up_skill,
+            commands::get_subtopics,
+            commands::update_subtopic_mastery,
+            commands::check_node_unlock,
+            commands::get_unlocked_nodes,
+            commands::get_milestones,
+            // ── Notifications ───────────────────────────────────────────────
+            commands::list_notifications,
+            commands::mark_notification_read,
+            commands::mark_all_notifications_read,
+            // ── Tasks ───────────────────────────────────────────────────────
             commands::list_tasks,
             commands::create_task,
             commands::complete_task,
             commands::delete_task,
+            // ── Goals ───────────────────────────────────────────────────────
             commands::list_goals,
+            commands::create_goal,
             commands::update_goal_progress,
+            // ── Grind ───────────────────────────────────────────────────────
             commands::log_grind_session,
             commands::list_grind_sessions,
+            // ── Projects ────────────────────────────────────────────────────
             commands::list_projects,
             commands::create_project,
             commands::move_project,
             commands::delete_project,
+            // ── Vitals ──────────────────────────────────────────────────────
             commands::log_sleep,
             commands::list_sleep_logs,
             commands::list_activity,
+            // ── Vault / Config ──────────────────────────────────────────────
             commands::set_vault_path,
             commands::list_vault_notes,
             commands::read_vault_note,
             commands::write_vault_note,
             commands::get_config,
             commands::set_config,
+            // ── Phase 2 — Sidecar ───────────────────────────────────────────
             commands_p2::sidecar_status,
-            commands_p2::sr_create_card,
-            commands_p2::sr_submit_review,
-            commands_p2::search_vault,
-            commands_p2::search_related,
-            commands_p2::llm_chat,
-            commands_p2::llm_practice,
-            commands_p2::llm_explain,
-            commands_p2::llm_ingest_paper,
-            commands_p3::backup_commit,
-            commands_p3::backup_push,
-            commands_p3::backup_set_remote,
-            commands_p3::sync_write_note,
-            commands_p3::sync_resolve,
-            commands_p3::graph_neighbours,
-            commands_p3::graph_find_path,
-            // (He omitido la lista larga aquí por brevedad, pero mantén todos tus comandos)
         ])
         .build(tauri::generate_context!())
         .expect("SynthesisOverthrust failed to build");
