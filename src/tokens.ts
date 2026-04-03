@@ -5,40 +5,66 @@
 // ============================================================
 
 // ── Colour palette ────────────────────────────────────────────────────────────
+// RPG Merged Architecture — Acrylic Blur + Slate tones
 export const C = {
-  bg: "#02020c",
-  surface: "#07071a",
-  surface2: "#0d0d23",
-  surface3: "#121230",
-  border: "#18183a",
-  border2: "#1f1f45",
+  bg: "#1A202C",                           // BG_RECESSED (slots/skill trees)
+  bgAcrylic: "rgba(45, 55, 72, 0.85)",    // BG_PRIMARY (acrylic blur panels)
+  surface: "#2D3748",
+  surface2: "#1A202C",
+  surface3: "#171923",
+  border: "rgba(255,255,255,0.1)",         // GEOMETRY border spec
+  border2: "rgba(255,255,255,0.15)",
 
-  accent: "#00e5ff",   // cyan  — MLE, primary CTA
-  gold: "#ffc107",   // gold  — XP, rewards
-  green: "#00ff88",   // green — done, success
-  red: "#ff4060",   // red   — danger, blocked
-  purple: "#9b59ff",   // purple — DE path, SP
+  accent: "#3B82F6",   // blue  — primary CTA (gradient start)
+  accentEnd: "#8B5CF6", // purple — gradient end
+  gold: "#ffc107",     // gold  — XP, rewards
+  green: "#22C55E",    // green — HP, success (STATUS spec)
+  red: "#ff4060",      // red   — danger, blocked
+  purple: "#8B5CF6",   // purple — SP
   orange: "#ff6b35",   // orange — level-up
-  pink: "#ff6bde",   // pink  — special
-  teal: "#00ffd4",   // teal  — vault
+  pink: "#ff6bde",     // pink  — special
+  teal: "#22D3EE",     // cyan  — high-contrast stats
 
-  mle: "#00e5ff",
-  de: "#9b59ff",
+  mle: "#3B82F6",
+  de: "#8B5CF6",
   ds: "#ffc107",
   aie: "#66FF99",
 
-  text: "#c5c7e8",
-  text2: "#8b8db8",
-  muted: "#66688a",
+  text: "#FFFFFF",      // TEXT primary
+  text2: "#94A3B8",     // TEXT muted
+  muted: "#94A3B8",     // TEXT muted (alias)
   dim: "#1a1a3c",
 } as const;
 
 // ── Fonts ─────────────────────────────────────────────────────────────────────
+// TYPOGRAPHY: Inter/Nunito. Numerics: Tabular Lining/Monospace
 export const F = {
-  display: "'Rajdhani', sans-serif",
+  display: "'Inter', 'Nunito', sans-serif",
   mono: "'Share Tech Mono', monospace",
-  body: "'Exo 2', sans-serif",
+  body: "'Inter', 'Nunito', sans-serif",
 } as const;
+
+// ── Geometry ──────────────────────────────────────────────────────────────────
+// GEOMETRY: Window Radius 16px. Element Radius 8-12px. Border: 1px rgba(255,255,255,0.1)
+export const BR = {
+  xs: 4,     // inline code, small tags
+  sm: 8,     // buttons, inputs, small cards
+  md: 12,    // medium containers, cards
+  lg: 16,    // windows, large panels
+  pill: 999, // pill-shaped action bar slots
+  circle: "50%" as const,
+} as const;
+
+// ELEVATION: Box-shadow spec
+export const SHADOW = {
+  card: "0 4px 16px rgba(0,0,0,0.3)",
+  elevated: "0 20px 40px rgba(0,0,0,0.4)",
+  glow: (col: string) => `0 0 20px ${col}33`,
+} as const;
+
+// ACTION BAR: 48x48px slots, minimum hit target 44x44px
+export const HIT_TARGET = 44;
+export const ACTION_SLOT = 48;
 
 // ── Global CSS injected once into <head> ──────────────────────────────────────
 export const GLOBAL_CSS = `
@@ -49,12 +75,14 @@ export const GLOBAL_CSS = `
     background: ${C.bg};
     color: ${C.text};
     font-family: ${F.body};
+    font-size: 12px;
+    line-height: 1.5;
     overflow: hidden;
   }
 
   ::-webkit-scrollbar       { width: 6px; height: 6px; }
   ::-webkit-scrollbar-track { background: ${C.surface}; }
-  ::-webkit-scrollbar-thumb { background: ${C.border2}; border-radius: 3px; }
+  ::-webkit-scrollbar-thumb { background: ${C.border2}; border-radius: ${BR.xs}px; }
   ::-webkit-scrollbar-thumb:hover { background: ${C.muted}; }
 
   ::selection { background: ${C.accent}44; color: ${C.accent}; }
@@ -132,7 +160,7 @@ export const GLOBAL_CSS = `
 
   /* Button hover */
   .nf-btn { transition: all 0.18s ease; }
-  .nf-btn:hover { filter: brightness(1.2); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(0,0,0,0.4); }
+  .nf-btn:hover { filter: brightness(1.2); transform: translateY(-1px); box-shadow: ${SHADOW.elevated}; }
   .nf-btn:active { transform: translateY(0); filter: brightness(0.95); }
 
   /* Card hover */
@@ -151,21 +179,22 @@ export const GLOBAL_CSS = `
 
 // ── Style factories ────────────────────────────────────────────────────────────
 export const card = (accentCol?: string, extra?: React.CSSProperties): React.CSSProperties => ({
-  background: C.surface,
+  background: C.bgAcrylic,
   border: `1px solid ${accentCol ? accentCol + "33" : C.border}`,
-  borderRadius: 12,
+  borderRadius: BR.md,
   padding: 20,
-  boxShadow: accentCol ? `0 0 30px ${accentCol}0d` : "none",
+  boxShadow: accentCol ? SHADOW.glow(accentCol) : SHADOW.card,
+  backdropFilter: "blur(12px)",
   ...extra,
 });
 
 export const glassCard = (col: string): React.CSSProperties => ({
-  background: `linear-gradient(135deg, ${C.surface} 0%, ${col}0a 100%)`,
+  background: `linear-gradient(135deg, ${C.bgAcrylic} 0%, ${col}0a 100%)`,
   border: `1px solid ${col}33`,
-  borderRadius: 12,
+  borderRadius: BR.md,
   padding: 20,
-  boxShadow: `0 0 30px ${col}12, inset 0 1px 0 ${col}22`,
-  backdropFilter: "blur(8px)",
+  boxShadow: `${SHADOW.elevated}, ${SHADOW.glow(col)}`,
+  backdropFilter: "blur(12px)",
 });
 
 export const btn = (col: string, sm?: boolean): React.CSSProperties => ({
@@ -173,7 +202,9 @@ export const btn = (col: string, sm?: boolean): React.CSSProperties => ({
   border: `1px solid ${col}55`,
   color: col,
   padding: sm ? "5px 11px" : "8px 18px",
-  borderRadius: 7,
+  minHeight: sm ? 32 : HIT_TARGET,
+  minWidth: sm ? 32 : HIT_TARGET,
+  borderRadius: BR.sm,
   cursor: "pointer",
   fontFamily: F.display,
   fontSize: sm ? 11 : 13,
@@ -182,6 +213,7 @@ export const btn = (col: string, sm?: boolean): React.CSSProperties => ({
   textTransform: "uppercase" as const,
   display: "inline-flex",
   alignItems: "center",
+  justifyContent: "center",
   gap: 5,
   whiteSpace: "nowrap" as const,
   transition: "all 0.18s ease",
@@ -194,7 +226,7 @@ export const primaryBtn = (sm?: boolean): React.CSSProperties => btn(C.accent, s
 export const inp: React.CSSProperties = {
   background: C.surface2,
   border: `1px solid ${C.border}`,
-  borderRadius: 7,
+  borderRadius: BR.sm,
   padding: "9px 13px",
   color: C.text,
   fontFamily: F.body,
@@ -209,31 +241,33 @@ export const sel: React.CSSProperties = { ...inp, cursor: "pointer" };
 
 export const tag = (col: string, sm?: boolean): React.CSSProperties => ({
   padding: sm ? "1px 6px" : "2px 9px",
-  borderRadius: 4,
+  borderRadius: BR.xs,
   background: `${col}1e`,
   color: col,
   fontSize: sm ? 10 : 11,
   fontWeight: 700,
   letterSpacing: 0.8,
   fontFamily: F.display,
+  fontVariantNumeric: "tabular-nums",
   whiteSpace: "nowrap",
   display: "inline-flex",
   alignItems: "center",
   gap: 3,
 });
 
+// RESOURCE CENTER: Thick horizontal bars, animated fill, bold centered numerics
 export const bar: React.CSSProperties = {
-  height: 6,
-  borderRadius: 3,
+  height: 8,
+  borderRadius: BR.xs,
   background: C.border,
   overflow: "hidden",
   position: "relative",
 };
 
-export const fill = (pct: number, col: string, h = 6): React.CSSProperties => ({
+export const fill = (pct: number, col: string, h = 8): React.CSSProperties => ({
   width: `${Math.min(100, Math.max(0, pct))}%`,
   height: h,
-  borderRadius: 3,
+  borderRadius: BR.xs,
   background: `linear-gradient(90deg, ${col}bb, ${col})`,
   boxShadow: `0 0 8px ${col}88`,
   transition: "width 0.6s cubic-bezier(0.4, 0, 0.2, 1)",
@@ -249,10 +283,11 @@ export const label: React.CSSProperties = {
   marginBottom: 5,
 };
 
+// TYPOGRAPHY: H1 18px Bold per spec
 export const h1: React.CSSProperties = {
-  fontSize: 28,
+  fontSize: 18,
   fontWeight: 700,
-  letterSpacing: 3,
+  letterSpacing: 2,
   textTransform: "uppercase",
   fontFamily: F.display,
   margin: 0,
@@ -278,10 +313,12 @@ export const h3: React.CSSProperties = {
   margin: "0 0 6px",
 };
 
-export const mono = (size = 12, col = C.text): React.CSSProperties => ({
+// NUMERICS: Tabular Lining/Monospace (font-variant-numeric: tabular-nums)
+export const mono = (size = 12, col: string = C.text): React.CSSProperties => ({
   fontFamily: F.mono,
   fontSize: size,
   color: col,
+  fontVariantNumeric: "tabular-nums",
 });
 
 export const row = (gap = 8): React.CSSProperties => ({
