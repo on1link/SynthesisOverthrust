@@ -1,5 +1,5 @@
 // ============================================================
-// Neural Forge — src-tauri/src/sidecar.rs
+// SynthesisOverthrust — src-tauri/src/sidecar.rs
 // Launches the Python sidecar (FastAPI on port 7731),
 // monitors it, and restarts if it crashes.
 // Tauri 2.0: uses std::process::Command (sidecar API is used
