@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — search/indexer.py
+# SynthesisOverthrust — search/indexer.py
 # Builds and maintains a FAISS index over Obsidian vault notes.
 # Uses IVFFlat index for fast ANN search over large vaults.
 # ============================================================

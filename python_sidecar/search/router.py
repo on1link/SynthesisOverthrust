@@ -1,5 +1,5 @@
 # ============================================================
-# Neural Forge — search/router.py
+# SynthesisOverthrust — search/router.py
 # Semantic search over Obsidian vault using FAISS + embeddings
 # ============================================================
 
