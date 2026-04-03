@@ -46,30 +46,30 @@ async def lifespan(app: FastAPI):
     await init_db()
 
     # Vault watcher
-    from sync.watcher import start_vault_watcher
-    if settings.VAULT_PATH:
-        await start_vault_watcher(settings.VAULT_PATH)
+    # from sync.watcher import start_vault_watcher
+    # if settings.VAULT_PATH:
+    #     await start_vault_watcher(settings.VAULT_PATH)
 
     # FAISS index (lazy rebuild if stale)
-    try:
-        from search.indexer import build_index_if_stale
-        asyncio.create_task(build_index_if_stale())
-    except Exception as e:
-        log.warning("FAISS index skipped", error=str(e))
+    # try:
+    #     from search.indexer import build_index_if_stale
+    #     asyncio.create_task(build_index_if_stale())
+    # except Exception as e:
+    #     log.warning("FAISS index skipped", error=str(e))
 
     # Knowledge graph (background build)
-    try:
-        from graph.builder import build_graph
-        asyncio.create_task(build_graph())
-    except Exception as e:
-        log.warning("Graph build skipped", error=str(e))
+    # try:
+    #     from graph.builder import build_graph
+    #     asyncio.create_task(build_graph())
+    # except Exception as e:
+    #     log.warning("Graph build skipped", error=str(e))
 
     # Git backup repo init
-    try:
-        from backup.git import ensure_git_repo
-        asyncio.create_task(ensure_git_repo(settings.DATA_DIR))
-    except Exception as e:
-        log.warning("Git init skipped", error=str(e))
+    # try:
+    #     from backup.git import ensure_git_repo
+    #     asyncio.create_task(ensure_git_repo(settings.DATA_DIR))
+    # except Exception as e:
+    #     log.warning("Git init skipped", error=str(e))
 
     # Plugin loader
     try:
@@ -106,16 +106,16 @@ app.add_middleware(
 )
 
 # ── Register routers ──────────────────────────────────────────────────────────
-app.include_router(sr_router,        prefix="/sr",        tags=["Spaced Repetition"])
-app.include_router(search_router,    prefix="/search",    tags=["Semantic Search"])
-app.include_router(llm_router,       prefix="/llm",       tags=["LLM / Ollama"])
-app.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
-app.include_router(sync_router,      prefix="/sync",      tags=["Obsidian Sync"])
-app.include_router(graph_router,     prefix="/graph",     tags=["Knowledge Graph"])
-app.include_router(collab_router,    prefix="/collab",    tags=["Study Rooms"])
-app.include_router(plugins_router,   prefix="/plugins",   tags=["Plugins"])
-app.include_router(backup_router,    prefix="/backup",    tags=["Backup"])
-app.include_router(mobile_router,    prefix="/mobile",    tags=["Mobile API"])
+# app.include_router(sr_router,        prefix="/sr",        tags=["Spaced Repetition"])
+# app.include_router(search_router,    prefix="/search",    tags=["Semantic Search"])
+# app.include_router(llm_router,       prefix="/llm",       tags=["LLM / Ollama"])
+# app.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
+# app.include_router(sync_router,      prefix="/sync",      tags=["Obsidian Sync"])
+# app.include_router(graph_router,     prefix="/graph",     tags=["Knowledge Graph"])
+# app.include_router(collab_router,    prefix="/collab",    tags=["Study Rooms"])
+ app.include_router(plugins_router,   prefix="/plugins",   tags=["Plugins"])
+# app.include_router(backup_router,    prefix="/backup",    tags=["Backup"])
+# app.include_router(mobile_router,    prefix="/mobile",    tags=["Mobile API"])
 
 
 # ── Health endpoint ───────────────────────────────────────────────────────────
