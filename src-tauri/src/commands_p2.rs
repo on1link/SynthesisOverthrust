@@ -6,7 +6,7 @@
 
 use crate::error::{NfError, Result};
 use crate::sidecar::{get, is_alive, post};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 // ── Convenience macro ─────────────────────────────────────────────────────────
 macro_rules! proxy_get {
@@ -35,53 +35,53 @@ pub async fn sr_get_due(limit: Option<u32>) -> Result<Value> {
 proxy_get!(sr_get_all, "/sr/all");
 proxy_get!(sr_get_stats, "/sr/stats");
 
-#[tauri::command]
-pub async fn sr_create_card(
-    node_id: String,
-    path_id: String,
-    front: String,
-    back: String,
-) -> Result<Value> {
-    post(
-        "/sr/create",
-        json!({"node_id":node_id,"path_id":path_id,"front":front,"back":back}),
-    )
-    .await
-    .map_err(|e| NfError::Sidecar(e.to_string()))
-}
+// #[tauri::command]
+// pub async fn sr_create_card(
+//     node_id: String,
+//     path_id: String,
+//     front: String,
+//     back: String,
+// ) -> Result<Value> {
+//     post(
+//         "/sr/create",
+//         json!({"node_id":node_id,"path_id":path_id,"front":front,"back":back}),
+//     )
+//     .await
+//     .map_err(|e| NfError::Sidecar(e.to_string()))
+// }
 
-#[tauri::command]
-pub async fn sr_submit_review(card_id: String, quality: u8) -> Result<Value> {
-    post("/sr/review", json!({"card_id":card_id,"quality":quality}))
-        .await
-        .map_err(|e| NfError::Sidecar(e.to_string()))
-}
+// #[tauri::command]
+// pub async fn sr_submit_review(card_id: String, quality: u8) -> Result<Value> {
+//     post("/sr/review", json!({"card_id":card_id,"quality":quality}))
+//         .await
+//         .map_err(|e| NfError::Sidecar(e.to_string()))
+// }
 
 // ════════════════════════════════════════════════════════════════════════════
 // SEMANTIC SEARCH
 // ════════════════════════════════════════════════════════════════════════════
 
-#[tauri::command]
-pub async fn search_vault(query: String, top_k: Option<u32>) -> Result<Value> {
-    let k = top_k.unwrap_or(8);
-    get(&format!(
-        "/search/query?q={}&top_k={k}",
-        urlencoding::encode(&query)
-    ))
-    .await
-    .map_err(|e| NfError::Sidecar(e.to_string()))
-}
-
-#[tauri::command]
-pub async fn search_related(skill_id: String, top_k: Option<u32>) -> Result<Value> {
-    let k = top_k.unwrap_or(5);
-    get(&format!("/search/related/{skill_id}?top_k={k}"))
-        .await
-        .map_err(|e| NfError::Sidecar(e.to_string()))
-}
-
-proxy_get!(search_reindex, "/search/reindex");
-proxy_get!(search_stats, "/search/stats");
+// #[tauri::command]
+// pub async fn search_vault(query: String, top_k: Option<u32>) -> Result<Value> {
+//     let k = top_k.unwrap_or(8);
+//     get(&format!(
+//         "/search/query?q={}&top_k={k}",
+//         urlencoding::encode(&query)
+//     ))
+//     .await
+//     .map_err(|e| NfError::Sidecar(e.to_string()))
+// }
+//
+// #[tauri::command]
+// pub async fn search_related(skill_id: String, top_k: Option<u32>) -> Result<Value> {
+//     let k = top_k.unwrap_or(5);
+//     get(&format!("/search/related/{skill_id}?top_k={k}"))
+//         .await
+//         .map_err(|e| NfError::Sidecar(e.to_string()))
+// }
+//
+// proxy_get!(search_reindex, "/search/reindex");
+// proxy_get!(search_stats, "/search/stats");
 
 // ════════════════════════════════════════════════════════════════════════════
 // LLM / OLLAMA
