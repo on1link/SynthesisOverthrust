@@ -249,6 +249,13 @@ fn main() {
             commands::set_config,
             // ── Phase 2 — Sidecar ───────────────────────────────────────────
             commands_p2::sidecar_status,
+            // ── Phase 2 — Spaced repetition ─────────────────────────────────
+            commands_p2::sr_get_due,
+            commands_p2::sr_get_all,
+            commands_p2::sr_get_stats,
+            commands_p2::sr_create_card,
+            commands_p2::sr_submit_review,
+            commands_p2::sr_backfill,
         ])
         .build(tauri::generate_context!())
         .expect("SynthesisOverthrust failed to build");

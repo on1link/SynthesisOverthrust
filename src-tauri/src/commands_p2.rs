@@ -35,27 +35,33 @@ pub async fn sr_get_due(limit: Option<u32>) -> Result<Value> {
 proxy_get!(sr_get_all, "/sr/all");
 proxy_get!(sr_get_stats, "/sr/stats");
 
-// #[tauri::command]
-// pub async fn sr_create_card(
-//     node_id: String,
-//     path_id: String,
-//     front: String,
-//     back: String,
-// ) -> Result<Value> {
-//     post(
-//         "/sr/create",
-//         json!({"node_id":node_id,"path_id":path_id,"front":front,"back":back}),
-//     )
-//     .await
-//     .map_err(|e| NfError::Sidecar(e.to_string()))
-// }
+#[tauri::command]
+pub async fn sr_create_card(
+    item_id: i64,
+    front: Option<String>,
+    back: Option<String>,
+) -> Result<Value> {
+    post(
+        "/sr/create",
+        json!({"item_id":item_id,"front":front,"back":back}),
+    )
+    .await
+    .map_err(|e| NfError::Sidecar(e.to_string()))
+}
 
-// #[tauri::command]
-// pub async fn sr_submit_review(card_id: String, quality: u8) -> Result<Value> {
-//     post("/sr/review", json!({"card_id":card_id,"quality":quality}))
-//         .await
-//         .map_err(|e| NfError::Sidecar(e.to_string()))
-// }
+#[tauri::command]
+pub async fn sr_submit_review(card_id: String, quality: u8) -> Result<Value> {
+    post("/sr/review", json!({"card_id":card_id,"quality":quality}))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn sr_backfill() -> Result<Value> {
+    post("/sr/backfill", json!({}))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // SEMANTIC SEARCH
