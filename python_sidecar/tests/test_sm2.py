@@ -6,17 +6,16 @@
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-from datetime import date, timedelta
+from datetime import date
 import pytest
 from sm2.engine import SRCard, review_card, initial_schedule
 
 
-def make_card(node_id="pytorch", ef=2.5, interval=1, reps=0) -> SRCard:
+def make_card(item_id=1, ef=2.5, interval=1, reps=0) -> SRCard:
     return SRCard(
         id="test-card",
         user_id="default",
-        node_id=node_id,
-        path_id="mle",
+        item_id=item_id,
         ease_factor=ef,
         interval=interval,
         repetitions=reps,
@@ -107,7 +106,8 @@ def test_initial_schedule():
     assert card.ease_factor == 2.5
     assert card.interval == 1
     assert card.repetitions == 0
-    assert card.due_date == date.today() + timedelta(days=1)
+    # Fresh cards are due immediately (first learning review today)
+    assert card.due_date == date.today()
 
 
 # ── Regression: fuzz doesn't produce 0-day interval ─────────────────────────

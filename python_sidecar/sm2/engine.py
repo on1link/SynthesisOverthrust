@@ -22,8 +22,7 @@ from typing import Optional
 class SRCard:
     id:           str
     user_id:      str
-    node_id:      str
-    path_id:      str
+    item_id:      int             # topic_items.id — lowest mastery unit
     ease_factor:  float   = 2.5
     interval:     int     = 1     # days until next review
     repetitions:  int     = 0
@@ -100,9 +99,9 @@ def review_card(card: SRCard, quality: int) -> ReviewResult:
 
 
 def initial_schedule(card: SRCard) -> SRCard:
-    """Set fresh card to first review tomorrow."""
+    """Set fresh card due immediately (first learning review today)."""
     card.ease_factor  = 2.5
     card.interval     = 1
     card.repetitions  = 0
-    card.due_date     = date.today() + timedelta(days=1)
+    card.due_date     = date.today()
     return card
