@@ -101,11 +101,12 @@ export const api = {
   // invoke<AssessmentAttempt[]>("list_assessment_history", { node_id, path_id }),
 
   // ── Phase 2 — Sidecar intelligence ───────────────────────────────────────
-  // srGetDue: (limit?: number) => invoke<SrCard[]>("sr_get_due", { limit }),
-  // srGetAll: () => invoke<SrCard[]>("sr_get_all"),
-  // srCreateCard: (args: SrCardArgs) => invoke<SrCard>("sr_create_card", args),
-  // srSubmitReview: (card_id: string, quality: number) => invoke<SrReviewResult>("sr_submit_review", { card_id, quality }),
-  // srGetStats: () => invoke<SrStats>("sr_get_stats"),
+  srGetDue: (limit?: number) => invoke<SrCard[]>("sr_get_due", { limit }),
+  srGetAll: () => invoke<SrCard[]>("sr_get_all"),
+  srCreateCard: (itemId: number, front?: string, back?: string) => invoke<SrCard>("sr_create_card", { itemId, front, back }),
+  srSubmitReview: (cardId: string, quality: number) => invoke<SrReviewResult>("sr_submit_review", { cardId, quality }),
+  srGetStats: () => invoke<SrStats>("sr_get_stats"),
+  srBackfill: () => invoke<{ created: number }>("sr_backfill"),
 
   // searchVault: (query: string, top_k?: number) => invoke<SearchResult[]>("search_vault", { query, top_k }),
   // searchRelated: (skill_id: string) => invoke<SearchResult[]>("search_related", { skill_id }),
@@ -466,9 +467,9 @@ export interface Activity { type: string; description?: string; xp: number; crea
 export interface VaultNote { path: string; title: string; word_count: number; modified_at: string; }
 
 // ── SR ────────────────────────────────────────────────────────────────────────
-export interface SrCard { id: string; node_id: string; path_id: string; subtopic_id?: string; front: string; back: string; interval: number; repetitions: number; ease_factor: number; due_date: string; }
-export interface SrStats { total: number; due_today: number; reviews_today: number; avg_ease: number; }
-export interface SrReviewResult { card_id: string; next_interval: number; next_due: string; }
+export interface SrCard { id: string; user_id: string; item_id: number; front: string; back: string; skill_id?: string; skill_name?: string; topic_name?: string; interval: number; repetitions: number; ease_factor: number; due_date: string; }
+export interface SrStats { total_cards: number; due_today: number; total_reviews: number; avg_ease_factor: number; retention: string; }
+export interface SrReviewResult { card_id: string; quality: number; new_ef: number; new_interval: number; due_date: string; again: boolean; mastery_delta: number; new_mastery: number; node_id?: string; node_level: number; }
 
 // ── Search / LLM / Analytics ──────────────────────────────────────────────────
 export interface SearchResult { path: string; title: string; chunk: string; score: number; }
@@ -504,4 +505,3 @@ export interface CreateGoalArgs { title: string; description?: string; goalType?
 export interface GrindArgs { platform: string; problemsSolved: number; durationMins: number; difficulty?: string; nodeId?: string; pathId?: string; subtopicId?: string; notes?: string; }
 export interface ProjectArgs { title: string; description?: string; repoUrl?: string; }
 export interface SleepArgs { hours: number; quality: number; energy: number; notes?: string; }
-export interface SrCardArgs { nodeId: string; pathId: string; subtopicId?: string; front: string; back: string; }

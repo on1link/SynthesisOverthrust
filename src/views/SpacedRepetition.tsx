@@ -6,7 +6,7 @@
 
 import React, { useCallback, useEffect, useState } from "react";
 import type { SrCard } from "../api";
-import * as api from "../api";
+import { api } from "../api";
 import { C, F, bar, btn, col_, fill, glassCard, grid, h1, row } from "../tokens";
 
 // ── SM-2 quality labels ───────────────────────────────────────────────────────
@@ -18,8 +18,6 @@ const QUALITIES = [
   { q: 4, label: "Good", sub: "Correct, slight hesitation", col: C.accent, key: "5" },
   { q: 5, label: "Perfect", sub: "Instant recall", col: C.green, key: "6" },
 ];
-
-const PATH_COL: Record<string, string> = { mle: C.mle, de: C.de, ds: C.ds };
 
 interface SessionStats {
   reviewed: number;
@@ -42,24 +40,40 @@ export default function SpacedRepetition() {
   const [srMeta, setSrMeta] = useState<any>(null);
   const [flashCol, setFlashCol] = useState<string | null>(null);
 
-  // ── Load due cards on mount ─────────────────────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      try {
-        const [dueCards, meta] = await Promise.all([
-          api.srGetDue(30),
-          api.srStats(),
-        ]);
-        setCards(dueCards);
-        setSrMeta(meta);
-      } catch (e) {
-        // Dev mode — use mock cards
-        setCards(MOCK_CARDS);
-      } finally {
-        setLoading(false);
-      }
-    })();
+  // ── Load due cards ──────────────────────────────────────────────────────────
+  const loadCards = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [dueCards, meta] = await Promise.all([
+        api.srGetDue(30),
+        api.srGetStats(),
+      ]);
+      setCards(dueCards);
+      setSrMeta(meta);
+      setCardIdx(0);
+      setRevealed(false);
+      setDone(false);
+    } catch (e) {
+      // Dev mode — use mock cards
+      setCards(MOCK_CARDS);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { loadCards(); }, [loadCards]);
+
+  // Create cards for every practiced item that has none yet, then reload.
+  const handleBackfill = useCallback(async () => {
+    setLoading(true);
+    try {
+      await api.srBackfill();
+      await loadCards();
+    } catch (e) {
+      console.error("Backfill failed:", e);
+      setLoading(false);
+    }
+  }, [loadCards]);
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────────
   useEffect(() => {
@@ -149,6 +163,9 @@ export default function SpacedRepetition() {
             No cards due today. Level up skills to create new cards,<br />
             or come back tomorrow for your scheduled reviews.
           </div>
+          <button onClick={handleBackfill} style={{ ...btn(C.purple), fontSize: 13, padding: "10px 22px" }}>
+            ⚡ Generate cards from practiced items
+          </button>
           {srMeta && (
             <div style={{ ...row(20), flexWrap: "wrap", justifyContent: "center", marginTop: 16 }}>
               {[
@@ -245,8 +262,7 @@ export default function SpacedRepetition() {
 
   // ── Active review ────────────────────────────────────────────────────────────
   const card_ = currentCard!;
-  const pathCol = PATH_COL[card_.path_id] ?? C.accent;
-  const [nodeName, nodeIcon] = resolveNodeMeta(card_.node_id);
+  const pathCol = C.purple;
 
   return (
     <div className="nf-view" style={col_(18)}>
@@ -301,8 +317,8 @@ export default function SpacedRepetition() {
 
         {/* Card meta */}
         <div style={{ ...row(8), marginBottom: 20, flexWrap: "wrap", justifyContent: "center" }}>
-          <span style={tag_(pathCol, true)}>{card_.path_id.toUpperCase()}</span>
-          <span style={tag_(pathCol, true)}>{nodeIcon} {nodeName}</span>
+          {card_.skill_name && <span style={tag_(pathCol, true)}>⬡ {card_.skill_name}</span>}
+          {card_.topic_name && <span style={tag_(pathCol, true)}>{card_.topic_name}</span>}
           <span style={tag_(C.muted, true)}>EF {card_.ease_factor.toFixed(2)}</span>
           <span style={tag_(C.muted, true)}>interval {card_.interval}d</span>
         </div>
@@ -312,7 +328,7 @@ export default function SpacedRepetition() {
           QUESTION
         </div>
         <div style={{ fontFamily: F.body, fontSize: 18, lineHeight: 1.8, color: C.text, maxWidth: 640, marginBottom: 24 }}>
-          {getCardQuestion(card_)}
+          {card_.front}
         </div>
 
         {/* Answer reveal */}
@@ -327,7 +343,7 @@ export default function SpacedRepetition() {
               ANSWER
             </div>
             <div style={{ fontFamily: F.body, fontSize: 16, lineHeight: 1.9, color: C.text2, maxWidth: 640 }}>
-              {getCardAnswer(card_)}
+              {card_.back}
             </div>
           </>
         )}
@@ -388,61 +404,11 @@ export default function SpacedRepetition() {
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const QUALITY_ICONS = ["💀", "✗", "😬", "😅", "✓", "⚡"];
 
-function resolveNodeMeta(nodeId: string): [string, string] {
-  const map: Record<string, [string, string]> = {
-    python: ["Python", "🐍"], git: ["Git & Linux", "🐧"],
-    numpy: ["NumPy", "🔢"], linalg: ["Lin. Algebra", "📐"],
-    stats: ["Statistics", "📊"], mlbasics: ["ML Concepts", "📚"],
-    pytorch: ["PyTorch", "🔥"], sklearn: ["Scikit-learn", "🤖"],
-    nn: ["Neural Nets", "🧠"], cuda: ["CUDA/GPU", "⚡"],
-    transformers: ["Transformers", "🤗"], mlops: ["MLOps", "🐳"],
-    distrib: ["Distributed", "🖥"], k8s: ["K8s/Cloud", "☁"],
-  };
-  return map[nodeId] ?? [nodeId, "⬡"];
-}
-
-function getCardQuestion(card: SrCard): string {
-  const qs: Record<string, string> = {
-    python: "What is the difference between a list and a tuple in Python? When would you use each?",
-    git: "Explain git rebase vs git merge. What are the tradeoffs?",
-    numpy: "How does NumPy broadcasting work? Give an example with incompatible shapes.",
-    linalg: "What is the geometric interpretation of the dot product? What does a negative dot product mean?",
-    stats: "Explain the Central Limit Theorem and why it matters for ML.",
-    mlbasics: "What is the bias-variance tradeoff? How does it relate to underfitting and overfitting?",
-    pytorch: "What is the difference between .detach() and torch.no_grad()? When do you use each?",
-    sklearn: "What does sklearn's Pipeline do and why is it important for preventing data leakage?",
-    nn: "Explain vanishing gradients. What causes them and how do modern architectures address this?",
-    cuda: "What is a CUDA kernel? How does thread/block/grid hierarchy map to parallelism?",
-    transformers: "Explain self-attention. How is it computed and what does the attention matrix represent?",
-    mlops: "What is model drift? How would you detect and respond to it in production?",
-  };
-  return qs[card.node_id] ?? `Explain the key concepts and practical applications of ${resolveNodeMeta(card.node_id)[0]}.`;
-}
-
-function getCardAnswer(card: SrCard): string {
-  const as: Record<string, string> = {
-    python: "Lists are mutable sequences; tuples are immutable. Use tuples for heterogeneous data that shouldn't change (e.g., RGB colours, coordinates) and as dict keys. Use lists when you need to append/modify. Tuples are faster and use less memory.",
-    git: "Merge preserves history with a merge commit (non-destructive, safe for public branches). Rebase rewrites commits onto a new base (cleaner history, never use on shared branches). Rule: merge for feature → main, rebase for keeping feature branch up-to-date.",
-    numpy: "Broadcasting applies operations on arrays of different shapes by virtually expanding the smaller array along dimensions of size 1. Rule: shapes are compatible if each dimension is equal or one of them is 1 — evaluated right-to-left. (3,4) + (4,) works; (3,4) + (3,) requires reshape.",
-    linalg: "Dot product = |A||B|cos(θ). It measures projection of one vector onto another. Positive → acute angle (similar direction). Zero → orthogonal. Negative → obtuse angle (opposite directions). Core of attention mechanisms and cosine similarity.",
-    stats: "CLT: the mean of n i.i.d. samples approaches a normal distribution as n→∞, regardless of the original distribution. Critical for ML because it justifies using Gaussian assumptions, validates bootstrapping, and underlies hypothesis testing even with non-normal data.",
-    mlbasics: "Bias = error from wrong assumptions (underfitting — model too simple). Variance = error from sensitivity to training data (overfitting — model too complex). Tradeoff: reducing bias increases variance and vice versa. Regularisation, ensembles, and cross-validation manage this.",
-    pytorch: ".detach() creates a new tensor that shares storage but is removed from the computation graph (gradient flows stop). torch.no_grad() disables gradient tracking for all operations in the block. Use .detach() to extract a tensor for non-grad use; use no_grad() for inference to save memory.",
-    sklearn: "Pipeline chains preprocessing + model steps, ensuring transformers are fit only on training data. Without it, fitting a scaler on all data before train/test split leaks test statistics into training, giving overly optimistic cross-validation scores.",
-    nn: "When gradients are multiplied through many layers with small weights (<1), they shrink exponentially → early layers learn extremely slowly. Solutions: ReLU activations (gradient=1 for positive), batch normalisation (normalises layer inputs), residual connections (gradient highway), careful initialisation (Xavier/He).",
-    cuda: "A CUDA kernel is a GPU function executed by thousands of threads in parallel. Threads are grouped into blocks, blocks into grids. Each thread gets a unique ID to determine which data element to process. Warps (32 threads) execute in lockstep — divergent branches cause serialisation.",
-    transformers: "For each position, compute Q, K, V matrices. Attention(Q,K,V) = softmax(QKᵀ/√d_k)V. The attention matrix (n×n) shows how much each token attends to every other token. Multi-head allows attending to different representation subspaces simultaneously. Complexity: O(n²d).",
-    mlops: "Model drift: data distribution shifts after deployment (data drift) or the relationship between features and target changes (concept drift). Detect with: monitoring input feature statistics, tracking prediction distributions, periodic evaluation against labelled samples. Respond with: retraining triggers, shadow models, A/B testing.",
-  };
-  return as[card.node_id] ?? `Review the documentation, implement a small example, and explain it using the Feynman technique. Aim to recall it without notes.`;
-}
-
-// Mock cards for dev mode
+// Mock cards for dev mode (sidecar down)
 const MOCK_CARDS: SrCard[] = [
-  { id: "c1", user_id: "default", node_id: "pytorch", path_id: "mle", ease_factor: 2.5, interval: 1, repetitions: 0, due_date: "today" },
-  { id: "c2", user_id: "default", node_id: "transformers", path_id: "mle", ease_factor: 2.3, interval: 3, repetitions: 2, due_date: "today" },
-  { id: "c3", user_id: "default", node_id: "stats", path_id: "mle", ease_factor: 2.7, interval: 7, repetitions: 4, due_date: "today" },
-  { id: "c4", user_id: "default", node_id: "nn", path_id: "mle", ease_factor: 2.1, interval: 1, repetitions: 1, due_date: "today" },
+  { id: "c1", user_id: "default", item_id: 1, front: "Recall: Tensors, autograd and the computation graph", back: "PyTorch Fundamentals — PyTorch", skill_id: "pytorch", skill_name: "PyTorch", topic_name: "Fundamentals", ease_factor: 2.5, interval: 1, repetitions: 0, due_date: "today" },
+  { id: "c2", user_id: "default", item_id: 2, front: "Recall: Self-attention and the QKV projection", back: "Attention — Transformers", skill_id: "transformers", skill_name: "Transformers", topic_name: "Attention", ease_factor: 2.3, interval: 3, repetitions: 2, due_date: "today" },
+  { id: "c3", user_id: "default", item_id: 3, front: "Recall: Central Limit Theorem and its role in ML", back: "Inference — Statistics", skill_id: "stats", skill_name: "Statistics", topic_name: "Inference", ease_factor: 2.7, interval: 7, repetitions: 4, due_date: "today" },
 ];
 
 // Re-export token helpers needed

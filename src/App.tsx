@@ -22,7 +22,7 @@ import { useGameState } from "./hooks/useGameState";
 // ── Phase 2 views ─────────────────────────────────────────────────────────────
 // import AITutor from "./views/AITutor";
 // import Analytics from "./views/Analytics";
-// import SpacedRepetition from "./views/SpacedRepetition";
+import SpacedRepetition from "./views/SpacedRepetition";
 
 // ── Phase 3 views ─────────────────────────────────────────────────────────────
 // import KnowledgeGraph from "./views/KnowledgeGraph";
@@ -36,9 +36,9 @@ import { C, F } from "./tokens";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type View =
-  | "dashboard" | "skills" | "onboard";
+  | "dashboard" | "skills" | "onboard" | "sr";
 // | "grind" | "projects" | "vitals" | "vault"
-// | "sr" | "ai" | "analytics"
+// | "ai" | "analytics"
 // | "graph" | "rooms" | "plugins" | "settings"
 
 // ── Sidecar status banner ─────────────────────────────────────────────────────
@@ -63,18 +63,18 @@ function SidecarBanner({ status }: { status: string }) {
 }
 
 // ── SR due count badge ────────────────────────────────────────────────────────
-// function useSrDueCount() {
-//   const [count, setCount] = useState(0);
-//   useEffect(() => {
-//     const load = () => invoke<{ length: number }>("sr_get_due", { limit: 50 })
-//       .then((r: any) => setCount(Array.isArray(r) ? r.length : 0))
-//       .catch(() => { });
-//     load();
-//     const interval = setInterval(load, 60_000);
-//     return () => clearInterval(interval);
-//   }, []);
-//   return count;
-// }
+function useSrDueCount() {
+  const [count, setCount] = useState(0);
+  useEffect(() => {
+    const load = () => invoke<{ length: number }>("sr_get_due", { limit: 50 })
+      .then((r: any) => setCount(Array.isArray(r) ? r.length : 0))
+      .catch(() => { });
+    load();
+    const interval = setInterval(load, 60_000);
+    return () => clearInterval(interval);
+  }, []);
+  return count;
+}
 
 // ── Root App ─── 
 export default function App() {
@@ -83,7 +83,7 @@ export default function App() {
   const [sidecarStatus, setSidecarStatus] = useState("");
   const [showOnboard, setShowOnboard] = useState(false);
   const gameState = useGameState();
-  // const srDue = useSrDueCount();
+  const srDue = useSrDueCount();
 
   // Listen for sidecar status events from Rust
   useEffect(() => {
@@ -180,7 +180,7 @@ export default function App() {
     //  />
     //),
     // Phase 2
-    // sr: <SpacedRepetition />,
+    sr: <SpacedRepetition />,
     // ai: <AITutor />,
     // analytics: <Analytics />,
     // // Phase 3
@@ -210,7 +210,7 @@ export default function App() {
         currentView={view}
         onNavigate={setView}
         gameState={gameState}
-        srDue={0}
+        srDue={srDue}
       />
       <main style={{ flex: 1, overflowY: "auto", padding: "28px 32px", marginTop: sidecarStatus && sidecarStatus !== "ready" ? 32 : 0 }}>
         {VIEWS[view]}

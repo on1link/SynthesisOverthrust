@@ -23,13 +23,13 @@ function buildNav(srDue: number): NavSection[] {
         //      { id:"vault",     icon:"📓", label:"Vault",    col:C.teal    },
       ]
     },
-    // {
-    //   label: "Intelligence", items: [
-    //     { id: "sr", icon: "🧠", label: "Reviews", col: C.purple, badge: srDue > 0 ? srDue : undefined },
-    //     //      { id:"ai",        icon:"🤖", label:"AI Tutor", col:C.accent  },
-    //     { id: "analytics", icon: "📈", label: "Analytics", col: C.gold },
-    //   ]
-    // },
+    {
+      label: "Intelligence", items: [
+        { id: "sr", icon: "🧠", label: "Reviews", col: C.purple, badge: srDue > 0 ? srDue : undefined },
+        //      { id:"ai",        icon:"🤖", label:"AI Tutor", col:C.accent  },
+        // { id: "analytics", icon: "📈", label: "Analytics", col: C.gold },
+      ]
+    },
     // {
     //   label: "Ecosystem", items: [
     //     //      { id:"graph",     icon:"🕸", label:"Graph",    col:C.teal    },
