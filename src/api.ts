@@ -104,7 +104,7 @@ export const api = {
   srGetDue: (limit?: number) => invoke<SrCard[]>("sr_get_due", { limit }),
   srGetAll: () => invoke<SrCard[]>("sr_get_all"),
   srCreateCard: (itemId: number, front?: string, back?: string) => invoke<SrCard>("sr_create_card", { itemId, front, back }),
-  srSubmitReview: (cardId: string, quality: number) => invoke<SrReviewResult>("sr_submit_review", { cardId, quality }),
+  srSubmitReview: (cardId: string, rating: number) => invoke<SrReviewResult>("sr_submit_review", { cardId, rating }),
   srGetStats: () => invoke<SrStats>("sr_get_stats"),
   srBackfill: () => invoke<{ created: number }>("sr_backfill"),
 
@@ -466,10 +466,10 @@ export interface SleepResult { logged: boolean; date: string; xp_result: XpResul
 export interface Activity { type: string; description?: string; xp: number; created_at: string; }
 export interface VaultNote { path: string; title: string; word_count: number; modified_at: string; }
 
-// ── SR ────────────────────────────────────────────────────────────────────────
-export interface SrCard { id: string; user_id: string; item_id: number; front: string; back: string; skill_id?: string; skill_name?: string; topic_name?: string; interval: number; repetitions: number; ease_factor: number; due_date: string; }
-export interface SrStats { total_cards: number; due_today: number; total_reviews: number; avg_ease_factor: number; retention: string; }
-export interface SrReviewResult { card_id: string; quality: number; new_ef: number; new_interval: number; due_date: string; again: boolean; mastery_delta: number; new_mastery: number; node_id?: string; node_level: number; }
+// ── SR (FSRS: rating 1=Again 2=Hard 3=Good 4=Easy) ───────────────────────────
+export interface SrCard { id: string; user_id: string; item_id: number; front: string; back: string; skill_id?: string; skill_name?: string; topic_name?: string; stability?: number; difficulty?: number; fsrs_state: number; repetitions: number; lapses: number; interval_days: number; due_date: string; due_at: string; }
+export interface SrStats { total_cards: number; due_today: number; total_reviews: number; avg_stability: number; avg_difficulty: number; retention: string; }
+export interface SrReviewResult { card_id: string; rating: number; stability?: number; difficulty?: number; interval_days: number; due_at: string; due_date: string; again: boolean; mastery_delta: number; new_mastery: number; node_id?: string; node_level: number; }
 
 // ── Search / LLM / Analytics ──────────────────────────────────────────────────
 export interface SearchResult { path: string; title: string; chunk: string; score: number; }

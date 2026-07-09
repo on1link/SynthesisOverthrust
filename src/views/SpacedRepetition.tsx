@@ -1,6 +1,6 @@
 // ============================================================
 // SynthesisOverthrust — src/components/SpacedRepetition.tsx
-// Flashcard review UI — SM-2 quality buttons, streak counter,
+// Flashcard review UI — FSRS rating buttons, streak counter,
 // session progress bar, retention stats.
 // ============================================================
 
@@ -9,22 +9,20 @@ import type { SrCard } from "../api";
 import { api } from "../api";
 import { C, F, bar, btn, col_, fill, glassCard, grid, h1, row } from "../tokens";
 
-// ── SM-2 quality labels ───────────────────────────────────────────────────────
-const QUALITIES = [
-  { q: 0, label: "Blackout", sub: "No recall", col: "#ff2050", key: "1" },
-  { q: 1, label: "Wrong", sub: "Incorrect", col: "#ff4060", key: "2" },
-  { q: 2, label: "Hard miss", sub: "Wrong + hint", col: "#ff6b35", key: "3" },
-  { q: 3, label: "Hard", sub: "Correct w/ effort", col: C.gold, key: "4" },
-  { q: 4, label: "Good", sub: "Correct, slight hesitation", col: C.accent, key: "5" },
-  { q: 5, label: "Perfect", sub: "Instant recall", col: C.green, key: "6" },
+// ── FSRS rating labels (1=Again 2=Hard 3=Good 4=Easy) ─────────────────────────
+const RATINGS = [
+  { r: 1, label: "Again", sub: "Forgot — relearn", col: "#ff2050", key: "1" },
+  { r: 2, label: "Hard", sub: "Recalled with effort", col: C.gold, key: "2" },
+  { r: 3, label: "Good", sub: "Recalled correctly", col: C.accent, key: "3" },
+  { r: 4, label: "Easy", sub: "Instant recall", col: C.green, key: "4" },
 ];
 
 interface SessionStats {
   reviewed: number;
   correct: number;
   again: number;
-  avgQuality: number;
-  qualities: number[];
+  avgRating: number;
+  ratings: number[];
 }
 
 export default function SpacedRepetition() {
@@ -35,7 +33,7 @@ export default function SpacedRepetition() {
   const [submitting, setSubmitting] = useState(false);
   const [done, setDone] = useState(false);
   const [stats, setStats] = useState<SessionStats>({
-    reviewed: 0, correct: 0, again: 0, avgQuality: 0, qualities: [],
+    reviewed: 0, correct: 0, again: 0, avgRating: 0, ratings: [],
   });
   const [srMeta, setSrMeta] = useState<any>(null);
   const [flashCol, setFlashCol] = useState<string | null>(null);
@@ -82,8 +80,8 @@ export default function SpacedRepetition() {
         if (!revealed) { setRevealed(true); return; }
       }
       if (revealed && !submitting) {
-        const q = QUALITIES.find(x => x.key === e.key);
-        if (q) handleQuality(q.q);
+        const rt = RATINGS.find(x => x.key === e.key);
+        if (rt) handleRating(rt.r);
       }
     };
     window.addEventListener("keydown", handler);
@@ -92,25 +90,25 @@ export default function SpacedRepetition() {
 
   const currentCard = cards[cardIdx] ?? null;
 
-  const handleQuality = useCallback(async (quality: number) => {
+  const handleRating = useCallback(async (rating: number) => {
     if (!currentCard || submitting) return;
     setSubmitting(true);
 
-    const col = QUALITIES.find(q => q.q === quality)?.col ?? C.gold;
+    const col = RATINGS.find(rt => rt.r === rating)?.col ?? C.gold;
     setFlashCol(col);
     setTimeout(() => setFlashCol(null), 300);
 
     try {
-      const result = await api.srSubmitReview(currentCard.id, quality);
+      const result = await api.srSubmitReview(currentCard.id, rating);
 
       setStats(prev => {
-        const qs = [...prev.qualities, quality];
+        const rs = [...prev.ratings, rating];
         return {
           reviewed: prev.reviewed + 1,
-          correct: prev.correct + (quality >= 3 ? 1 : 0),
+          correct: prev.correct + (rating >= 2 ? 1 : 0),
           again: prev.again + (result.again ? 1 : 0),
-          avgQuality: qs.reduce((a, b) => a + b, 0) / qs.length,
-          qualities: qs,
+          avgRating: rs.reduce((a, b) => a + b, 0) / rs.length,
+          ratings: rs,
         };
       });
 
@@ -172,7 +170,7 @@ export default function SpacedRepetition() {
                 { v: srMeta.total_cards, l: "Total Cards", col: C.accent },
                 { v: srMeta.total_reviews, l: "All-time Reviews", col: C.purple },
                 { v: srMeta.retention, l: "Retention", col: C.green },
-                { v: srMeta.avg_ease_factor.toFixed(2), l: "Avg EF", col: C.gold },
+                { v: `${srMeta.avg_stability?.toFixed(1) ?? "0.0"}d`, l: "Avg Stability", col: C.gold },
               ].map(({ v, l, col }) => (
                 <div key={l} style={{ ...glassCard(col), textAlign: "center", padding: "14px 20px", minWidth: 110 }}>
                   <div style={{ fontFamily: F.mono, fontSize: 22, color: col, fontWeight: 700 }}>{v}</div>
@@ -217,17 +215,17 @@ export default function SpacedRepetition() {
               </div>
             ))}
           </div>
-          {/* Quality distribution bar */}
+          {/* Rating distribution bar */}
           <div style={{ width: "100%", maxWidth: 500 }}>
             <div style={{ fontFamily: F.display, fontSize: 10, color: C.muted, letterSpacing: 2, marginBottom: 10, textAlign: "center" }}>
-              QUALITY DISTRIBUTION
+              RATING DISTRIBUTION
             </div>
             <div style={{ display: "flex", height: 32, borderRadius: 8, overflow: "hidden", gap: 2 }}>
-              {QUALITIES.map(q => {
-                const count = stats.qualities.filter(x => x === q.q).length;
+              {RATINGS.map(q => {
+                const count = stats.ratings.filter(x => x === q.r).length;
                 const pct = stats.reviewed > 0 ? (count / stats.reviewed) * 100 : 0;
                 return pct > 0 ? (
-                  <div key={q.q} title={`${q.label}: ${count}`} style={{
+                  <div key={q.r} title={`${q.label}: ${count}`} style={{
                     width: `${pct}%`,
                     background: q.col,
                     display: "flex",
@@ -246,12 +244,12 @@ export default function SpacedRepetition() {
               })}
             </div>
             <div style={{ ...row(), justifyContent: "space-between", marginTop: 8 }}>
-              <span style={{ fontFamily: F.display, fontSize: 9, color: C.red }}>Hard / Missed</span>
-              <span style={{ fontFamily: F.display, fontSize: 9, color: C.green }}>Perfect Recall</span>
+              <span style={{ fontFamily: F.display, fontSize: 9, color: C.red }}>Again</span>
+              <span style={{ fontFamily: F.display, fontSize: 9, color: C.green }}>Easy</span>
             </div>
           </div>
           <button
-            onClick={() => { setDone(false); setCardIdx(0); setRevealed(false); setStats({ reviewed: 0, correct: 0, again: 0, avgQuality: 0, qualities: [] }); }}
+            onClick={() => { setDone(false); setCardIdx(0); setRevealed(false); setStats({ reviewed: 0, correct: 0, again: 0, avgRating: 0, ratings: [] }); }}
             style={{ ...btn(C.accent), fontSize: 14, padding: "12px 28px" }}>
             ↩ Review Again
           </button>
@@ -319,8 +317,9 @@ export default function SpacedRepetition() {
         <div style={{ ...row(8), marginBottom: 20, flexWrap: "wrap", justifyContent: "center" }}>
           {card_.skill_name && <span style={tag_(pathCol, true)}>⬡ {card_.skill_name}</span>}
           {card_.topic_name && <span style={tag_(pathCol, true)}>{card_.topic_name}</span>}
-          <span style={tag_(C.muted, true)}>EF {card_.ease_factor.toFixed(2)}</span>
-          <span style={tag_(C.muted, true)}>interval {card_.interval}d</span>
+          <span style={tag_(C.muted, true)}>S {card_.stability != null ? `${card_.stability.toFixed(1)}d` : "new"}</span>
+          <span style={tag_(C.muted, true)}>D {card_.difficulty != null ? card_.difficulty.toFixed(1) : "—"}</span>
+          <span style={tag_(C.muted, true)}>reps {card_.repetitions}</span>
         </div>
 
         {/* Question */}
@@ -349,16 +348,16 @@ export default function SpacedRepetition() {
         )}
       </div>
 
-      {/* ── Quality buttons ─────────────────────────────────────────────────── */}
+      {/* ── Rating buttons ─────────────────────────────────────────────────── */}
       {revealed && (
         <div style={{ animation: "nf-fadein 0.2s ease" }}>
           <div style={{ fontFamily: F.display, fontSize: 10, color: C.muted, letterSpacing: 2, textAlign: "center", marginBottom: 12 }}>
-            HOW WELL DID YOU RECALL?  <span style={{ color: C.dim }}>(keys 1–6)</span>
+            HOW WELL DID YOU RECALL?  <span style={{ color: C.dim }}>(keys 1–4)</span>
           </div>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "center" }}>
-            {QUALITIES.map(q => (
-              <button key={q.q}
-                onClick={() => handleQuality(q.q)}
+            {RATINGS.map(q => (
+              <button key={q.r}
+                onClick={() => handleRating(q.r)}
                 disabled={submitting}
                 style={{
                   padding: "14px 18px",
@@ -381,7 +380,7 @@ export default function SpacedRepetition() {
                 onMouseEnter={e => { if (!submitting) (e.currentTarget as HTMLElement).style.background = `${q.col}35`; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background = `${q.col}18`; }}
               >
-                <span style={{ fontSize: 18 }}>{QUALITY_ICONS[q.q]}</span>
+                <span style={{ fontSize: 18 }}>{RATING_ICONS[q.r]}</span>
                 <span style={{ fontSize: 12, letterSpacing: 1 }}>{q.label}</span>
                 <span style={{ fontSize: 9, color: `${q.col}99`, letterSpacing: 0.5 }}>{q.sub}</span>
                 <span style={{ fontSize: 9, color: C.muted, fontFamily: F.mono }}>key {q.key}</span>
@@ -393,22 +392,23 @@ export default function SpacedRepetition() {
 
       {/* Tip */}
       <div style={{ fontFamily: F.body, fontSize: 11, color: C.muted, textAlign: "center", lineHeight: 1.8 }}>
-        Be honest — the algorithm works best with accurate ratings.{" "}
-        <span style={{ color: C.purple }}>Grade 3 or higher</span> advances the card.
-        Grade 0–2 resets to tomorrow.
+        Be honest — FSRS schedules best with accurate ratings.{" "}
+        <span style={{ color: C.purple }}>Hard, Good and Easy</span> advance the card;{" "}
+        <span style={{ color: C.red }}>Again</span> sends it back to relearning.
       </div>
     </div>
   );
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-const QUALITY_ICONS = ["💀", "✗", "😬", "😅", "✓", "⚡"];
+// Index 1-4 (FSRS ratings); index 0 unused.
+const RATING_ICONS = ["", "💀", "😅", "✓", "⚡"];
 
 // Mock cards for dev mode (sidecar down)
 const MOCK_CARDS: SrCard[] = [
-  { id: "c1", user_id: "default", item_id: 1, front: "Recall: Tensors, autograd and the computation graph", back: "PyTorch Fundamentals — PyTorch", skill_id: "pytorch", skill_name: "PyTorch", topic_name: "Fundamentals", ease_factor: 2.5, interval: 1, repetitions: 0, due_date: "today" },
-  { id: "c2", user_id: "default", item_id: 2, front: "Recall: Self-attention and the QKV projection", back: "Attention — Transformers", skill_id: "transformers", skill_name: "Transformers", topic_name: "Attention", ease_factor: 2.3, interval: 3, repetitions: 2, due_date: "today" },
-  { id: "c3", user_id: "default", item_id: 3, front: "Recall: Central Limit Theorem and its role in ML", back: "Inference — Statistics", skill_id: "stats", skill_name: "Statistics", topic_name: "Inference", ease_factor: 2.7, interval: 7, repetitions: 4, due_date: "today" },
+  { id: "c1", user_id: "default", item_id: 1, front: "Recall: Tensors, autograd and the computation graph", back: "PyTorch Fundamentals — PyTorch", skill_id: "pytorch", skill_name: "PyTorch", topic_name: "Fundamentals", stability: 2.5, difficulty: 4.2, fsrs_state: 2, repetitions: 1, lapses: 0, interval_days: 1, due_date: "today", due_at: "today" },
+  { id: "c2", user_id: "default", item_id: 2, front: "Recall: Self-attention and the QKV projection", back: "Attention — Transformers", skill_id: "transformers", skill_name: "Transformers", topic_name: "Attention", stability: 8.1, difficulty: 6.0, fsrs_state: 2, repetitions: 3, lapses: 1, interval_days: 7, due_date: "today", due_at: "today" },
+  { id: "c3", user_id: "default", item_id: 3, front: "Recall: Central Limit Theorem and its role in ML", back: "Inference — Statistics", skill_id: "stats", skill_name: "Statistics", topic_name: "Inference", fsrs_state: 1, repetitions: 0, lapses: 0, interval_days: 0, due_date: "today", due_at: "today" },
 ];
 
 // Re-export token helpers needed
