@@ -260,6 +260,11 @@ fn main() {
             commands_p2::catalog_ingest,
             commands_p2::catalog_search,
             commands_p2::catalog_stats,
+            // ── Phase 2 — Skill Scout ───────────────────────────────────────
+            commands_p2::scout_run,
+            commands_p2::scout_proposals,
+            commands_p2::scout_decide,
+            commands_p2::scout_fewshot,
         ])
         .build(tauri::generate_context!())
         .expect("SynthesisOverthrust failed to build");

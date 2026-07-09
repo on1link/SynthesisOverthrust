@@ -108,6 +108,19 @@ export const api = {
   srGetStats: () => invoke<SrStats>("sr_get_stats"),
   srBackfill: () => invoke<{ created: number }>("sr_backfill"),
 
+  // ── Skills catalog (LanceDB) ──────────────────────────────────────────────
+  catalogIngest: () => invoke<{ ingested: number; skills: number }>("catalog_ingest"),
+  catalogSearch: (query: string, k?: number, role?: string, tier?: string) =>
+    invoke<CatalogHit[]>("catalog_search", { query, k, role, tier }),
+  catalogStats: () => invoke<CatalogStats>("catalog_stats"),
+
+  // ── Skill Scout ───────────────────────────────────────────────────────────
+  scoutRun: (sources?: string[], limit?: number) => invoke<ScoutRunResult>("scout_run", { sources, limit }),
+  scoutProposals: (status?: string) => invoke<ScoutProposal[]>("scout_proposals", { status }),
+  scoutDecide: (proposalId: string, action: "approve" | "edit" | "reject", edits?: { skill?: string; topic?: string; tier?: string; roles?: string[] }) =>
+    invoke<ScoutDecision>("scout_decide", { proposalId, action, ...edits }),
+  scoutFewshot: () => invoke<ScoutFewshot[]>("scout_fewshot"),
+
   // searchVault: (query: string, top_k?: number) => invoke<SearchResult[]>("search_vault", { query, top_k }),
   // searchRelated: (skill_id: string) => invoke<SearchResult[]>("search_related", { skill_id }),
   // searchReindex: () => invoke<void>("search_reindex"),
@@ -470,6 +483,16 @@ export interface VaultNote { path: string; title: string; word_count: number; mo
 export interface SrCard { id: string; user_id: string; item_id: number; front: string; back: string; skill_id?: string; skill_name?: string; topic_name?: string; stability?: number; difficulty?: number; fsrs_state: number; repetitions: number; lapses: number; interval_days: number; due_date: string; due_at: string; }
 export interface SrStats { total_cards: number; due_today: number; total_reviews: number; avg_stability: number; avg_difficulty: number; retention: string; }
 export interface SrReviewResult { card_id: string; rating: number; stability?: number; difficulty?: number; interval_days: number; due_at: string; due_date: string; again: boolean; mastery_delta: number; new_mastery: number; node_id?: string; node_level: number; }
+
+// ── Catalog / Scout ───────────────────────────────────────────────────────────
+export interface CatalogHit { id: string; skill: string; skill_slug: string; topic: string; subtopic: string; tier: string; roles: string[]; max_level?: number; prerequisites: string; score: number; }
+export interface CatalogStats { ingested: boolean; subtopics: number; skills: number; by_tier?: Record<string, number>; }
+export interface ScoutRunResult { candidates: number; proposed: number; skipped_covered: number; skipped_foreign: number; duplicates: number; }
+export interface ScoutPlacement { skill: string; skill_slug?: string; topic: string; tier: string; roles: string[]; }
+export interface ScoutNeighbor { skill: string; topic: string; subtopic: string; tier: string; score: number; }
+export interface ScoutProposal { id: string; source: string; external_id: string; title: string; summary: string; url: string; proposed: ScoutPlacement; similarity: number; neighbors: ScoutNeighbor[]; status: string; created_at: string; }
+export interface ScoutDecision { status: string; placement?: Record<string, unknown>; lance_id?: string; }
+export interface ScoutFewshot { title: string; summary: string; proposed: { skill: string; topic: string; tier: string }; decision: string; final?: Record<string, unknown>; }
 
 // ── Search / LLM / Analytics ──────────────────────────────────────────────────
 export interface SearchResult { path: string; title: string; chunk: string; score: number; }

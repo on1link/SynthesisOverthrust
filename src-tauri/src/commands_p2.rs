@@ -98,6 +98,50 @@ pub async fn catalog_search(
 proxy_get!(catalog_stats, "/catalog/stats");
 
 // ════════════════════════════════════════════════════════════════════════════
+// SKILL SCOUT (discovery agent + correction loop)
+// ════════════════════════════════════════════════════════════════════════════
+
+#[tauri::command]
+pub async fn scout_run(sources: Option<Vec<String>>, limit: Option<u32>) -> Result<Value> {
+    post(
+        "/scout/run",
+        json!({"sources": sources, "limit": limit.unwrap_or(15)}),
+    )
+    .await
+    .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn scout_proposals(status: Option<String>) -> Result<Value> {
+    let s = status.unwrap_or_else(|| "pending".into());
+    get(&format!("/scout/proposals?status={}", urlencoding::encode(&s)))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn scout_decide(
+    proposal_id: String,
+    action: String,
+    skill: Option<String>,
+    topic: Option<String>,
+    tier: Option<String>,
+    roles: Option<Vec<String>>,
+) -> Result<Value> {
+    post(
+        "/scout/decide",
+        json!({
+            "proposal_id": proposal_id, "action": action,
+            "skill": skill, "topic": topic, "tier": tier, "roles": roles,
+        }),
+    )
+    .await
+    .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+proxy_get!(scout_fewshot, "/scout/fewshot");
+
+// ════════════════════════════════════════════════════════════════════════════
 // SEMANTIC SEARCH
 // ════════════════════════════════════════════════════════════════════════════
 

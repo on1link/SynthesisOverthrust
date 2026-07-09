@@ -23,6 +23,7 @@ import { useGameState } from "./hooks/useGameState";
 // import AITutor from "./views/AITutor";
 // import Analytics from "./views/Analytics";
 import SpacedRepetition from "./views/SpacedRepetition";
+import Scout from "./views/Scout";
 
 // ── Phase 3 views ─────────────────────────────────────────────────────────────
 // import KnowledgeGraph from "./views/KnowledgeGraph";
@@ -36,7 +37,7 @@ import { C, F } from "./tokens";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type View =
-  | "dashboard" | "skills" | "onboard" | "sr";
+  | "dashboard" | "skills" | "onboard" | "sr" | "scout";
 // | "grind" | "projects" | "vitals" | "vault"
 // | "ai" | "analytics"
 // | "graph" | "rooms" | "plugins" | "settings"
@@ -181,6 +182,7 @@ export default function App() {
     //),
     // Phase 2
     sr: <SpacedRepetition />,
+    scout: <Scout />,
     // ai: <AITutor />,
     // analytics: <Analytics />,
     // // Phase 3
