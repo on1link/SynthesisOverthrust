@@ -428,4 +428,40 @@ re-embeds migrations cleanly — the real DB gets deduped on next app start.
 - Services restarted per Q2 after the iteration.
 
 ### Dev — Commits
-- (this commit) feat: wire Grind, Projects and Vault views (B1–B3)
+- `3d6eb13` feat: wire Grind, Projects and Vault views (B1–B3)
+
+---
+
+## Iteration 7 — Story SO-6: learning loop (B4–B6)
+
+**Date:** 2026-07-09
+**Status:** DONE
+
+> As a learner, I can drill practice problems per subtopic, track learning
+> resources per skill, and log focus sessions — all feeding mastery/XP.
+
+**Drift found (§6.6 again):** all five learning-loop commands existed in Rust
+since Phase 1 but queried tables NO migration ever created (`practice_problems`,
+`practice_attempts`, `learning_resources`, `resource_progress`,
+`focus_sessions`). Commands were also never registered.
+
+**Dev**
+- `009_learning_loop.sql`: the five tables (column sets derived from the Rust
+  queries = wire truth) + demo seed (5 Calculus/Limits problems, 4 resources).
+- Registered all five commands in `main.rs`; `api.ts` wrappers enabled with
+  camelCase invoke keys (snake_case arg objects mapped in the wrapper).
+- `LearningLoop.tsx`: PracticeCard (subtopic picker → drill → self-grade →
+  mastery/XP feedback), ResourcesCard (+25%/done progress), FocusCard
+  (pomodoro/deep/review/assessment + duration + notes). Wired into Skills
+  detail view and Grind view.
+
+**QA**
+- Harness: **43 tables** now (matches contexto §6's original count, amusingly),
+  5 problems + 4 resources seeded, integrity ok. `cargo check` clean (009
+  embeds). `tsc` clean on touched files; `vite build` OK.
+- pytest baseline unchanged (91 passed / 15 pre-existing).
+- Note: these commands are Rust-direct (no sidecar), so curl can't smoke them —
+  first full-app validation lands with the next `tauri dev` session.
+
+### Dev — Commits
+- (this commit) feat: learning loop — practice drills, resources, focus sessions (B4–B6)

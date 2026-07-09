@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from "react";
 import type { UseGameState } from "../hooks/useGameState";
+import { FocusCard } from "./LearningLoop";
 import {
   BR, C, F, card,
   col_,
@@ -68,6 +69,9 @@ export default function Grind({ sessions, loadSessions, logSession }: Props) {
         </div>
         <h1 style={h1}>Grind Station</h1>
       </div>
+
+      {/* Focus session logger (B6) */}
+      <FocusCard />
 
       {/* Platform grid */}
       <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>

@@ -20,6 +20,7 @@ import type {
   User,
 } from "../api";
 import { api } from "../api";
+import { PracticeCard, ResourcesCard } from "./LearningLoop";
 import { C, F, BR, SHADOW, card, btn, tag, bar, fill, row, col_, h1, mono } from "../tokens";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -346,6 +347,21 @@ export default function Skills({ skillData, refreshSkills, levelUpSkill }: Skill
             <div style={{ fontFamily: F.body, fontSize: 12, color: C.muted, textAlign: "center", padding: "20px 0" }}>No subtopics loaded</div>
           )}
         </div>
+
+        {/* Practice drill (B4) */}
+        <PracticeCard
+          nodeId={sk.id}
+          pathId={activeRole}
+          col={col}
+          subtopics={subtopics}
+          onMasteryChange={() => {
+            api.getSubtopics(sk.id, activeRole).then(setSubtopics).catch(() => {});
+            refreshSkills();
+          }}
+        />
+
+        {/* Learning resources (B5) */}
+        <ResourcesCard nodeId={sk.id} pathId={activeRole} col={col} />
 
         {/* Prerequisites & Unlocks */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 12 }}>

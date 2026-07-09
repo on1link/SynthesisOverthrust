@@ -33,15 +33,25 @@ export const api = {
   updateSubtopicMastery: (subtopicId: string, pathId: string, delta: number) => invoke<MasteryUpdate>("update_subtopic_mastery", { subtopicId, pathId, delta }),
 
   // ── Practice problems ─────────────────────────────────────────────────────
-  // listPracticeProblems: (subtopic_id: string, path_id: string, difficulty?: string, limit?: number) => invoke<PracticeProblem[]>("list_practice_problems", { subtopic_id, path_id, difficulty, limit }),
-  // submitPracticeAttempt: (args: PracticeAttemptArgs) => invoke<PracticeAttemptResult>("submit_practice_attempt", args),
+  listPracticeProblems: (subtopicId: string, pathId: string, difficulty?: string, limit?: number) =>
+    invoke<PracticeProblem[]>("list_practice_problems", { subtopicId, pathId, difficulty, limit }),
+  submitPracticeAttempt: (a: PracticeAttemptArgs) =>
+    invoke<PracticeAttemptResult>("submit_practice_attempt", {
+      problemId: a.problem_id, subtopicId: a.subtopic_id, pathId: a.path_id,
+      correct: a.correct, timeTakenS: a.time_taken_s, hintUsed: a.hint_used,
+    }),
 
   // ── Learning resources ────────────────────────────────────────────────────
-  // listResources: (node_id: string, path_id: string) => invoke<LearningResource[]>("list_resources", { node_id, path_id }),
-  // updateResourceProgress: (resource_id: string, pct_complete: number) => invoke<void>("update_resource_progress", { resource_id, pct_complete }),
+  listResources: (nodeId: string, pathId: string) => invoke<LearningResource[]>("list_resources", { nodeId, pathId }),
+  updateResourceProgress: (resourceId: string, pctComplete: number) =>
+    invoke<void>("update_resource_progress", { resourceId, pctComplete }),
 
   // ── Focus sessions ────────────────────────────────────────────────────────
-  // logFocusSession: (args: FocusSessionArgs) => invoke<FocusResult>("log_focus_session", args),
+  logFocusSession: (a: FocusSessionArgs) =>
+    invoke<FocusResult>("log_focus_session", {
+      durationMins: a.duration_mins, sessionType: a.session_type,
+      nodeId: a.node_id, subtopicId: a.subtopic_id, pathId: a.path_id, notes: a.notes,
+    }),
 
   // ── Node unlocks ──────────────────────────────────────────────────────────
   checkNodeUnlock: (nodeId: string, pathId: string) => invoke<UnlockResult>("check_node_unlock", { nodeId, pathId }),

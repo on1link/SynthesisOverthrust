@@ -240,6 +240,12 @@ fn main() {
             commands::log_sleep,
             commands::list_sleep_logs,
             commands::list_activity,
+            // ── Learning loop (B4–B6) ───────────────────────────────────────
+            commands::list_practice_problems,
+            commands::submit_practice_attempt,
+            commands::list_resources,
+            commands::update_resource_progress,
+            commands::log_focus_session,
             // ── Vault / Config ──────────────────────────────────────────────
             commands::set_vault_path,
             commands::list_vault_notes,
