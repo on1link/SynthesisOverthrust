@@ -274,3 +274,91 @@ Retrieval spot-checks all semantically on-target:
   `NF_CATALOG_PATH`.
 - lancedb `table_names()` deprecation warning — cosmetic, revisit on upgrade.
 - No UI this story (P1 scope is the retrieval API); Skill Scout (P2) consumes it next.
+
+---
+
+## Iteration 4 — Story SO-4: Skill Scout agent + correction loop (P2)
+
+**Date:** 2026-07-09
+**Status:** DONE (QA passed — with one process-level incident, see findings)
+
+### Story SO-4
+
+> As a learner, the Skill Scout discovers new techniques from arXiv and
+> HuggingFace, proposes a catalog placement {skill, topic, tier, roles} via
+> LanceDB nearest-cluster retrieval, and I approve/edit/reject each proposal
+> in the UI — approved corrections write back to BOTH LanceDB and SQLite and
+> accumulate as few-shot examples (contexto §5 correction loop).
+
+**Acceptance criteria**
+1. `POST /scout/run` fetches recent arXiv (cs.LG/cs.CL) + HuggingFace trending
+   items, embeds title+summary, retrieves top-k neighbors from LanceDB, and
+   stores proposals with similarity + neighbor explainability.
+2. Novelty bands: top-1 score ≥ high threshold → skipped as already-covered;
+   below low threshold → skipped as off-catalog; middle band → proposal.
+   `UNIQUE(source, external_id)` prevents re-proposing; rejected stay rejected.
+3. `POST /scout/decide` (approve/edit/reject): approve/edit appends the new
+   subtopic to the LanceDB catalog table AND upserts skills/topics/topic_items
+   in SQLite (so it becomes mastery-trackable). Reject only records status.
+4. `GET /scout/fewshot` returns accumulated corrections (decided proposals with
+   final placements) for future LLM-assisted classification.
+5. Scout view in UI (Intelligence section): proposal cards with source link,
+   proposed placement, neighbors; Approve / Edit / Reject actions.
+6. Tests use injected transport (fixture XML/JSON) + fake embedder — no network,
+   no model downloads. Live QA does one real run.
+
+**Decisions**
+- **D8 — classifier is nearest-neighbor, no LLM in this slice**: skill = modal
+  skill of top-k, topic = best hit's topic in that skill, tier/roles inherited.
+  Deterministic and testable; LLM re-ranking is a follow-up once Ollama (B8) lands.
+- **D9 — agents never read the raw catalog** (token-efficiency rule §5): Scout
+  consumes `/catalog` retrieval only.
+- **D10 — cloud-provider changelogs deferred** (RSS scraping brittle; arXiv+HF
+  give the highest signal per effort). Backlog as SO-4b.
+
+### Dev — Commits
+- `27087a7` feat: Skill Scout agent with correction loop (P2)
+- `6cba164` fix: remove test pollution from legacy event_loop fixture and config reload
+- `c87f19c` feat: Scout view with approve/edit/reject correction flow
+
+### QA — Findings
+**pytest:** 87 passed (11 new scout tests). Root-caused and fixed two latent
+test-infrastructure bugs in `test_beta.py` that only bit when suites ran
+together: a legacy session-scoped `event_loop` fixture, and
+`test_env_override`'s `reload(config)` which swapped the `settings` singleton
+out from under already-imported modules. Pre-existing failures now **14**
+(was 15; the SO-D1 batch shrinks as infrastructure heals).
+
+**Live run (real arXiv + HuggingFace):** 24 candidates → 24 proposals with
+sensible placements (LLM releases → Gen AI & LLMs topics; agents model →
+Agents; tabular FM → Python/ML ecosystem). Approve → SQLite item created +
+LanceDB record retrievable; reject → status only; double-decide → 409;
+rating/action validation → 422/404. Few-shot pool returns decided examples.
+
+**⚠ Incident — QA traffic hit the real app DB.** `scripts/dev.sh` (user-run,
+09:41, `uvicorn --reload`) was already bound to port 7731; all live QA curls
+this session reached IT, not the NF_DB_PATH-scoped QA sidecars (which failed
+to bind, silently). Footprint on the real DB: 24 scout proposals (22 pending,
+1 approved: "InternScience/Agents-A1" → Gen AI & LLMs › Agents as
+topic_item 8189, also appended to real LanceDB), ~36 sr_cards + 4 sr_reviews
+from earlier iterations' QA, small mastery deltas on a few real items. Real
+LanceDB got the full catalog ingest (which is the intended production state).
+**Guide to decide:** keep the pending proposals (triage them in the Scout
+view) or purge; cleanup SQL documented below. Process fix → QA rule Q1.
+
+**Q1 (new QA rule):** before live HTTP QA, verify port ownership
+(`pgrep -af uvicorn`) and confirm the sidecar's logged `path=` matches the
+QA database. Never assume a fresh bind succeeded.
+
+**Cleanup SQL (if guide wants the QA artifacts gone):**
+```sql
+DELETE FROM scout_proposals;                          -- or WHERE status='pending'
+DELETE FROM topic_items  WHERE id = 8189;             -- approved scout item
+DELETE FROM sr_reviews;  DELETE FROM sr_cards;        -- QA review artifacts
+```
+
+**⚠ New defect SO-D4 (pre-existing, real DB):** seed migration ran multiple
+times against the production DB — `topic_items` ids 8041–8188 duplicate
+earlier seed rows (id-less INSERTs are not idempotent). Duplicates dilute
+`v_node_mastery` averages with 0-mastery copies. Needs a dedup migration +
+idempotent seed guards. High priority next iteration.
