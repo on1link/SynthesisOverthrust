@@ -64,6 +64,40 @@ pub async fn sr_backfill() -> Result<Value> {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
+// SKILLS CATALOG (LanceDB retrieval)
+// ════════════════════════════════════════════════════════════════════════════
+
+#[tauri::command]
+pub async fn catalog_ingest() -> Result<Value> {
+    post("/catalog/ingest", json!({}))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn catalog_search(
+    query: String,
+    k: Option<u32>,
+    role: Option<String>,
+    tier: Option<String>,
+) -> Result<Value> {
+    let mut url = format!(
+        "/catalog/search?q={}&k={}",
+        urlencoding::encode(&query),
+        k.unwrap_or(8)
+    );
+    if let Some(r) = role {
+        url.push_str(&format!("&role={}", urlencoding::encode(&r)));
+    }
+    if let Some(t) = tier {
+        url.push_str(&format!("&tier={}", urlencoding::encode(&t)));
+    }
+    get(&url).await.map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+proxy_get!(catalog_stats, "/catalog/stats");
+
+// ════════════════════════════════════════════════════════════════════════════
 // SEMANTIC SEARCH
 // ════════════════════════════════════════════════════════════════════════════
 

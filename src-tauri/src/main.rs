@@ -256,6 +256,10 @@ fn main() {
             commands_p2::sr_create_card,
             commands_p2::sr_submit_review,
             commands_p2::sr_backfill,
+            // ── Phase 2 — Skills catalog (LanceDB) ──────────────────────────
+            commands_p2::catalog_ingest,
+            commands_p2::catalog_search,
+            commands_p2::catalog_stats,
         ])
         .build(tauri::generate_context!())
         .expect("SynthesisOverthrust failed to build");
