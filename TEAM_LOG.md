@@ -326,8 +326,8 @@ Retrieval spot-checks all semantically on-target:
 test-infrastructure bugs in `test_beta.py` that only bit when suites ran
 together: a legacy session-scoped `event_loop` fixture, and
 `test_env_override`'s `reload(config)` which swapped the `settings` singleton
-out from under already-imported modules. Pre-existing failures now **14**
-(was 15; the SO-D1 batch shrinks as infrastructure heals).
+out from under already-imported modules. The 15 pre-existing SO-D1 failures
+remain (stale imports), but they no longer poison other suites.
 
 **Live run (real arXiv + HuggingFace):** 24 candidates → 24 proposals with
 sensible placements (LLM releases → Gen AI & LLMs topics; agents model →
@@ -362,3 +362,31 @@ times against the production DB — `topic_items` ids 8041–8188 duplicate
 earlier seed rows (id-less INSERTs are not idempotent). Duplicates dilute
 `v_node_mastery` averages with 0-mastery copies. Needs a dedup migration +
 idempotent seed guards. High priority next iteration.
+
+---
+
+## Iteration 5 — Defect fix SO-D4: topic_items dedup + idempotent seed
+
+**Date:** 2026-07-09
+**Status:** DONE
+
+Root cause: `004_seed_skill_tree.sql` inserts `topic_items` WITHOUT explicit
+ids, so its `INSERT OR IGNORE` never ignores (no unique constraint) — every
+seed re-run duplicated all 92 items. The real DB had two extra passes
+(ids 8041–8188).
+
+**Fix — `008_dedup_topic_items.sql`:**
+1. Builds a dup→canonical map (lowest id per `(topic_id, content)` wins).
+2. Re-points `user_item_mastery` and `sr_cards` to the canonical item;
+   on clash the canonical row wins; orphaned `sr_reviews` cleaned.
+3. Deletes duplicates, then adds `UNIQUE INDEX (topic_id, content)` so the
+   seed's `OR IGNORE` finally bites — re-runs are now idempotent.
+
+**QA:** 4 new tests (double-seed reproduces defect; 008 dedups and locks;
+progress on a duplicate id survives on the canonical id; canonical wins on
+clash). Full suite 91 passed / same 15 pre-existing. Harness: double-seed +
+full chain + 008 → 92 items, 0 dups, 20 indexes, integrity ok. `cargo check`
+re-embeds migrations cleanly — the real DB gets deduped on next app start.
+
+### Dev — Commits
+- (this commit) fix: dedup topic_items and make seed idempotent (SO-D4)
