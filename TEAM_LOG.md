@@ -109,3 +109,66 @@ No frontend test runner configured (vitest missing) → SO-D3.
 - **SO-D3**: add vitest + RTL for frontend (contexto DoD expects it).
 - **SO-2 (next story candidate)**: FSRS engine swap behind `/sr/review` (guide to confirm).
 - UI walkthrough in `tauri dev` on a display session to close AC-5 visually.
+
+---
+
+## Iteration 2 — Story SO-2: FSRS engine swap (guide-confirmed)
+
+**Date:** 2026-07-09
+**Status:** DONE (QA passed; UI walkthrough in `tauri dev` still pending a display session)
+
+**Guide decisions (2026-07-09):** ① FSRS confirmed, UI updated accordingly.
+② Iteration-1 baseline accepted; contexto §6 stays as-is, TEAM_LOG is authoritative.
+③ Catalog (`Synthesis Overthrust Catalog.md`, 218K chars) is to be read only in
+per-`##` chunks — chunked to scratchpad with INDEX; structure:
+`## Role → ### Tier/SKILL → ###### Topic → - subtopic` bullets. Feeds P1 later.
+
+### Story SO-2
+
+> As a learner, my reviews are scheduled by FSRS (py-fsrs 6.3.1) instead of SM-2,
+> and the review UI offers the four FSRS ratings (Again/Hard/Good/Easy).
+
+**Acceptance criteria**
+1. `fsrs` dependency added; scheduling delegated to py-fsrs `Scheduler`
+   (default parameters, desired_retention 0.9).
+2. Migration 006 adds FSRS state to `sr_cards` (stability, difficulty,
+   fsrs_state, step, lapses, due_at) and stability/difficulty logging to
+   `sr_reviews`; existing rows backfilled (`due_at` from `due_date`). No 001 edits.
+3. `POST /sr/review` takes `rating` 1–4; mastery deltas Again −3 / Hard +1 /
+   Good +4 / Easy +6; correct = rating ≥ 2; mastery propagation unchanged.
+4. Review UI shows 4 rating buttons (keys 1–4), stability/difficulty replace EF.
+5. pytest green (FSRS engine unit + updated flow tests); harness passes.
+
+**Decisions**
+- **D5 — module rename `sm2/` → `sr/`** (engine no longer SM-2; imports updated).
+- **D6 — rating stored in existing `sr_reviews.quality` column** (1–4 fits the
+  0–5 CHECK); `prev_ef`/`new_ef` left NULL by FSRS path; new stability/difficulty
+  columns log the FSRS trajectory.
+- **D7 — sub-day scheduling kept** (FSRS learning steps 1m/10m): `due_at`
+  (full ISO, UTC) drives the due queue; `due_date` kept as date-only mirror for UI.
+
+### Dev — Commits
+- `4943bd8` feat: swap SM-2 for FSRS scheduling engine (py-fsrs 6.x)
+- `9dc29a1` feat: proxy FSRS rating through sr_submit_review
+- `e4e3af1` feat: switch Review UI to four FSRS rating buttons
+
+### QA — Findings
+**Harness baseline updated:** 37 tables, 3 views, **18 indexes** (was 17);
+`sr_cards` 17 cols, `sr_reviews` 14 cols, integrity ok.
+
+**pytest:** 65 passed — 26 SR (11 FSRS engine unit incl. state transitions,
+lapse→Relearning, stability growth; 15 flow) — same 15 pre-existing failures (SO-D1).
+
+**Live sidecar (fresh DB):** backfill → 3 Learning cards due immediately;
+Good → S 2.31 / D 2.12, due +10 min (learning step), mastery 55→59;
+Again → S 0.78 / D 7.39, lapse counted, mastery 59→56; rating 7 → 422,
+bad card → 404; stats deliver avg_stability/avg_difficulty/retention 50%.
+
+**Rust/TS:** `cargo check` clean; `tsc --noEmit` clean on touched files.
+
+**Notes**
+- FSRS learning steps (1 m / 10 m) mean fresh cards come due again within the
+  session — matches Anki-style relearning; the due queue uses `due_at` (UTC).
+- `test_beta.py` TestSM2 group now doubly stale after the sm2→sr rename (SO-D1).
+- Catalog chunks live in session scratchpad only; regenerate on demand with the
+  split-by-`##` script (structure documented above).
