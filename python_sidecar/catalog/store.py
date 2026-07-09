@@ -69,6 +69,39 @@ def ingest(
     return len(rows)
 
 
+def add_records(
+    records: List[SubtopicRecord],
+    embedder: Optional[Embedder] = None,
+    db_path: Optional[str] = None,
+) -> int:
+    """Append records to an existing catalog table (correction write-back)."""
+    if not records:
+        return 0
+    embed = embedder or default_embedder
+    db = _connect(db_path)
+    if TABLE_NAME not in db.table_names():
+        raise FileNotFoundError("catalog table not ingested yet")
+    tbl = db.open_table(TABLE_NAME)
+
+    vectors = embed([r.embed_text for r in records])
+    rows = []
+    for r, vec in zip(records, vectors):
+        rows.append({
+            "id":            r.id,
+            "vector":        vec,
+            "skill":         r.skill,
+            "skill_slug":    r.skill_slug,
+            "topic":         r.topic,
+            "subtopic":      r.subtopic,
+            "tier":          r.tier,
+            "roles":         "," + ",".join(r.roles) + ",",
+            "max_level":     r.max_level or 0,
+            "prerequisites": r.prerequisites,
+        })
+    tbl.add(rows)
+    return len(rows)
+
+
 def search(
     query: str,
     k: int = 8,
