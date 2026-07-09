@@ -18,11 +18,9 @@ import pytest
 # FIXTURES
 # ══════════════════════════════════════════════════════════════════════════════
 
-@pytest.fixture(scope="session")
-def event_loop():
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
+# NOTE: the legacy session-scoped `event_loop` fixture was removed — it
+# conflicts with pytest-asyncio 1.x loop management and poisoned async
+# fixtures in suites that ran after this file.
 
 
 @pytest.fixture(scope="session")
@@ -354,11 +352,10 @@ class TestConfig:
         assert "sqlite" in settings.db_url
 
     def test_env_override(self, monkeypatch):
+        # No module reload here: reload(config) replaces the `settings`
+        # singleton and poisons every module that already imported it.
+        # Settings() reads the environment at construction time anyway.
         monkeypatch.setenv("NF_PORT", "9999")
-        from importlib import reload
-        import config
-        reload(config)
         from config import Settings
         s = Settings()
         assert s.PORT == 9999
-        monkeypatch.delenv("NF_PORT")
