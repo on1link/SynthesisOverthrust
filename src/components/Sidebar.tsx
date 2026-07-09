@@ -17,10 +17,10 @@ function buildNav(srDue: number): NavSection[] {
       label: "Core", items: [
         { id: "dashboard", icon: "⊞", label: "Command", col: C.accent },
         { id: "skills", icon: "⬡", label: "Skills", col: C.mle },
-        //{ id: "grind", icon: "⚡", label: "Grind", col: C.gold },
-        //{ id: "projects", icon: "⎇", label: "Projects", col: C.purple },
-        //{ id: "vitals", icon: "♡", label: "Vitals", col: C.green },
-        //      { id:"vault",     icon:"📓", label:"Vault",    col:C.teal    },
+        { id: "grind", icon: "⚡", label: "Grind", col: C.gold },
+        { id: "projects", icon: "⎇", label: "Projects", col: C.purple },
+        { id: "vault", icon: "📓", label: "Vault", col: C.teal },
+        // vitals parked by guide (2026-07-09 triage)
       ]
     },
     {

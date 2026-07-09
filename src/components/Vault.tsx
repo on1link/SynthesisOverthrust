@@ -63,7 +63,7 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
 
   const filtered = vaultNotes.filter(n =>
     n.title.toLowerCase().includes(search.toLowerCase()) ||
-    n.tags.toLowerCase().includes(search.toLowerCase())
+    n.path.toLowerCase().includes(search.toLowerCase())
   );
 
   const totalWords = vaultNotes.reduce((s, n) => s + n.word_count, 0);
@@ -149,7 +149,8 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
             ) : (
               filtered.map(note => {
                 const isSel = selNote?.path === note.path;
-                const tags = (() => { try { return JSON.parse(note.tags) as string[]; } catch { return []; } })();
+                // vault_index carries no tags column — nothing to parse
+                const tags: string[] = [];
                 return (
                   <div key={note.path}
                     className="nf-card-hover"

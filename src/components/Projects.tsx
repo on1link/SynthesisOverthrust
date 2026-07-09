@@ -208,8 +208,10 @@ function ProjectCard({
   onMove: (s: string) => void;
   onDelete: () => void;
 }) {
-  const col = TYPE_COL[project.project_type] ?? C.muted;
-  const icon = TYPE_ICON[project.project_type] ?? "📁";
+  // createProject stores the chosen type in `description` (see useGameState)
+  const projectType = project.description ?? "";
+  const col = TYPE_COL[projectType] ?? C.muted;
+  const icon = TYPE_ICON[projectType] ?? "📁";
 
   const nextStatus = project.status === "backlog" ? "active" : project.status === "active" ? "done" : null;
   const prevStatus = project.status === "done" ? "active" : project.status === "active" ? "backlog" : null;
@@ -237,13 +239,8 @@ function ProjectCard({
 
       {/* Tags */}
       <div style={{ ...row(5), flexWrap: "wrap", marginBottom: 10 }}>
-        <span style={tag(col, true)}>{project.project_type}</span>
+        {projectType && <span style={tag(col, true)}>{projectType}</span>}
         <span style={tag(C.gold, true)}>+{project.xp_reward} XP</span>
-        {project.status === "done" && project.completed_at && (
-          <span style={tag(C.green, true)}>
-            {new Date(project.completed_at).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
-          </span>
-        )}
       </div>
 
       {/* Action buttons */}

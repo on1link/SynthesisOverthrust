@@ -389,4 +389,43 @@ full chain + 008 → 92 items, 0 dups, 20 indexes, integrity ok. `cargo check`
 re-embeds migrations cleanly — the real DB gets deduped on next app start.
 
 ### Dev — Commits
-- (this commit) fix: dedup topic_items and make seed idempotent (SO-D4)
+- `13fc528` fix: dedup topic_items and make seed idempotent (SO-D4)
+
+---
+
+## Guide decisions (2026-07-09, post-iteration 5)
+
+- **QA artifacts stay in the real DB** until end of project / first production
+  build running at 100% — the pending Scout proposals are live triage material.
+  Cleanup SQL from iteration 4 is parked, not executed.
+- **Q2 (new rule): restart services after every iteration** — kill stray
+  sidecar/uvicorn processes and relaunch cleanly to avoid stale bindings and
+  hot-reload drift.
+
+---
+
+## Iteration 6 — Story SO-5: wire Grind, Projects, Vault views (B1–B3)
+
+**Date:** 2026-07-09
+**Status:** DONE
+
+> As a learner, the Grind, Projects and Vault views are reachable from the
+> sidebar and work against the existing registered Tauri commands.
+
+**Dev**
+- App routes + Core nav entries wired for `grind`, `projects`, `vault`
+  (Vitals stays parked per triage). `useGameState` already exposed every prop.
+- Fixed phantom-field TS errors against the actual Rust payloads:
+  - `Projects.tsx` used `project_type`/`completed_at` — `list_projects`
+    returns neither; the type lives in `description` (createProject maps it).
+  - `Vault.tsx` used `tags` — `vault_index` has no tags column; search now
+    falls back to path matching. Tag chips render empty until a tags column
+    exists (noted for B14 Obsidian sync).
+
+**QA**
+- `tsc --noEmit`: wired files clean (SO-D2 debt shrinks by two components).
+- `vite build`: production bundle OK (44 modules).
+- Services restarted per Q2 after the iteration.
+
+### Dev — Commits
+- (this commit) feat: wire Grind, Projects and Vault views (B1–B3)

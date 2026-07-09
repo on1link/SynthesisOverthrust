@@ -10,13 +10,13 @@ import { useCallback, useEffect, useState } from "react";
 
 // ── Phase 1 components ────────────────────────────────────────────────────────
 import Dashboard from "./components/Dashboard";
-// import Grind from "./components/Grind";
-// import Projects from "./components/Projects";
+import Grind from "./components/Grind";
+import Projects from "./components/Projects";
 import Sidebar from "./components/Sidebar";
 import Skills from "./components/Skills";
 import Toast from "./components/Toast";
-// import Vault from "./components/Vault";
-// import Vitals from "./components/Vitals";
+import Vault from "./components/Vault";
+// import Vitals from "./components/Vitals";  // parked by guide
 import { useGameState } from "./hooks/useGameState";
 
 // ── Phase 2 views ─────────────────────────────────────────────────────────────
@@ -37,9 +37,9 @@ import { C, F } from "./tokens";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type View =
-  | "dashboard" | "skills" | "onboard" | "sr" | "scout";
-// | "grind" | "projects" | "vitals" | "vault"
-// | "ai" | "analytics"
+  | "dashboard" | "skills" | "onboard" | "sr" | "scout"
+  | "grind" | "projects" | "vault";
+// | "vitals" (parked) | "ai" | "analytics"
 // | "graph" | "rooms" | "plugins" | "settings"
 
 // ── Sidecar status banner ─────────────────────────────────────────────────────
@@ -151,35 +151,30 @@ export default function App() {
         levelUpSkill={gameState.levelUpSkill}
       />
     ),
-    // grind: (
-    //   <Grind
-    //     sessions={gameState.sessions}
-    //     loadSessions={gameState.loadSessions}
-    //     logSession={gameState.logSession}
-    //   />
-    // ),
-    // projects: (
-    //   <Projects
-    //     projects={gameState.projects}
-    //     createProject={gameState.createProject}
-    //     moveProject={gameState.moveProject}
-    //     deleteProject={gameState.deleteProject}
-    //   />
-    // ),
-    // vitals: (
-    //   <Vitals
-    //     sleepLogs={gameState.sleepLogs}
-    //     logSleep={gameState.logSleep}
-    //   />
-    // ),
-    //vault: (
-    //  <Vault
-    //    vaultNotes={gameState.vaultNotes}
-    //    setVaultPath={gameState.setVaultPath}
-    //    readNote={gameState.readNote}
-    //    writeNote={gameState.writeNote}
-    //  />
-    //),
+    grind: (
+      <Grind
+        sessions={gameState.sessions}
+        loadSessions={gameState.loadSessions}
+        logSession={gameState.logSession}
+      />
+    ),
+    projects: (
+      <Projects
+        projects={gameState.projects}
+        createProject={gameState.createProject}
+        moveProject={gameState.moveProject}
+        deleteProject={gameState.deleteProject}
+      />
+    ),
+    // vitals: parked by guide (2026-07-09 triage)
+    vault: (
+      <Vault
+        vaultNotes={gameState.vaultNotes}
+        setVaultPath={gameState.setVaultPath}
+        readNote={gameState.readNote}
+        writeNote={gameState.writeNote}
+      />
+    ),
     // Phase 2
     sr: <SpacedRepetition />,
     scout: <Scout />,
