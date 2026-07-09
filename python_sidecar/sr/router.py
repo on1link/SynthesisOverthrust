@@ -1,55 +1,73 @@
 # ============================================================
-# SynthesisOverthrust — sm2/router.py
-# FastAPI routes for spaced repetition card management.
+# SynthesisOverthrust — sr/router.py
+# FastAPI routes for spaced repetition card management (FSRS).
 #
 # Cards are keyed to topic_items (lowest mastery unit).
-# A review updates: card schedule (SM-2) → sr_reviews log →
+# A review updates: card schedule (FSRS) → sr_reviews log →
 # user_item_mastery upsert → v_node_mastery (view, recomputed).
 # ============================================================
 
 from __future__ import annotations
 import uuid
-from datetime import date
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from .engine import SRCard, review_card, initial_schedule
+from .engine import SRCard, review_card, new_card_schedule
 from db import get_db
 
 router = APIRouter()
 
-# Mastery delta per review quality (practice flow uses +8/−3; SR weighted lower)
-MASTERY_DELTA = {0: -4, 1: -3, 2: -2, 3: 2, 4: 4, 5: 6}
+# Mastery delta per FSRS rating (practice flow uses +8/−3; SR weighted lower)
+MASTERY_DELTA = {1: -3, 2: 1, 3: 4, 4: 6}   # Again / Hard / Good / Easy
+
+
+def _utc_now() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _parse_dt(value: Optional[str]) -> Optional[datetime]:
+    """Parse an ISO timestamp from SQLite; naive values are assumed UTC."""
+    if not value:
+        return None
+    dt = datetime.fromisoformat(value)
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
 class CardOut(BaseModel):
-    id:           str
-    user_id:      str
-    item_id:      int
-    front:        str
-    back:         str
-    skill_id:     Optional[str] = None
-    skill_name:   Optional[str] = None
-    topic_name:   Optional[str] = None
-    ease_factor:  float
-    interval:     int
-    repetitions:  int
-    due_date:     str
+    id:            str
+    user_id:       str
+    item_id:       int
+    front:         str
+    back:          str
+    skill_id:      Optional[str] = None
+    skill_name:    Optional[str] = None
+    topic_name:    Optional[str] = None
+    stability:     Optional[float] = None
+    difficulty:    Optional[float] = None
+    fsrs_state:    int
+    repetitions:   int
+    lapses:        int
+    interval_days: int
+    due_date:      str
+    due_at:        str
 
 
 class ReviewIn(BaseModel):
     card_id: str
-    quality: int   # 0-5
+    rating:  int   # 1 = Again, 2 = Hard, 3 = Good, 4 = Easy
 
 
 class ReviewOut(BaseModel):
     card_id:       str
-    quality:       int
-    new_ef:        float
-    new_interval:  int
+    rating:        int
+    stability:     Optional[float] = None
+    difficulty:    Optional[float] = None
+    interval_days: int
+    due_at:        str
     due_date:      str
     again:         bool
     mastery_delta: int
@@ -76,19 +94,24 @@ _CARD_SELECT = """
 
 
 def _row_to_card_out(row) -> CardOut:
+    due_at = _parse_dt(row["due_at"]) or _utc_now()
     return CardOut(
-        id          = row["id"],
-        user_id     = row["user_id"],
-        item_id     = row["item_id"],
-        front       = row["front"],
-        back        = row["back"],
-        skill_id    = row["skill_id"],
-        skill_name  = row["skill_name"],
-        topic_name  = row["topic_name"],
-        ease_factor = row["ease_factor"],
-        interval    = row["interval"],
-        repetitions = row["repetitions"],
-        due_date    = row["due_date"],
+        id            = row["id"],
+        user_id       = row["user_id"],
+        item_id       = row["item_id"],
+        front         = row["front"],
+        back          = row["back"],
+        skill_id      = row["skill_id"],
+        skill_name    = row["skill_name"],
+        topic_name    = row["topic_name"],
+        stability     = row["stability"],
+        difficulty    = row["difficulty"],
+        fsrs_state    = row["fsrs_state"],
+        repetitions   = row["repetitions"],
+        lapses        = row["lapses"],
+        interval_days = max(0, (due_at - _utc_now()).days),
+        due_date      = row["due_date"],
+        due_at        = due_at.isoformat(),
     )
 
 
@@ -107,14 +130,17 @@ async def _item_context(db, item_id: int):
 
 async def _insert_card(db, user_id: str, item_id: int, front: str, back: str) -> SRCard:
     card = SRCard(id=str(uuid.uuid4()), user_id=user_id, item_id=item_id)
-    initial_schedule(card)
+    new_card_schedule(card)
     await db.execute(
         """INSERT INTO sr_cards
-           (id, user_id, item_id, front, back, ease_factor, interval, repetitions, due_date)
-           VALUES (?,?,?,?,?,?,?,?,?)""",
+           (id, user_id, item_id, front, back,
+            stability, difficulty, fsrs_state, step, repetitions, lapses,
+            due_at, due_date)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
         (card.id, card.user_id, card.item_id, front, back,
-         card.ease_factor, card.interval, card.repetitions,
-         card.due_date.isoformat())
+         card.stability, card.difficulty, card.fsrs_state, card.step,
+         card.repetitions, card.lapses,
+         card.due_at.isoformat(), card.due_at.date().isoformat())
     )
     return card
 
@@ -123,12 +149,12 @@ async def _insert_card(db, user_id: str, item_id: int, front: str, back: str) ->
 
 @router.get("/due", response_model=List[CardOut])
 async def get_due_cards(user_id: str = "default", limit: int = 20):
-    """Return cards due for review today (sorted by overdue first)."""
+    """Return cards due for review now (sorted by most overdue first)."""
     db = await get_db()
-    today = date.today().isoformat()
+    now = _utc_now().isoformat()
     async with db.execute(
-        _CARD_SELECT + " WHERE c.user_id = ? AND c.due_date <= ? ORDER BY c.due_date ASC LIMIT ?",
-        (user_id, today, limit)
+        _CARD_SELECT + " WHERE c.user_id = ? AND c.due_at <= ? ORDER BY c.due_at ASC LIMIT ?",
+        (user_id, now, limit)
     ) as cur:
         rows = await cur.fetchall()
     return [_row_to_card_out(r) for r in rows]
@@ -138,7 +164,7 @@ async def get_due_cards(user_id: str = "default", limit: int = 20):
 async def get_all_cards(user_id: str = "default"):
     db = await get_db()
     async with db.execute(
-        _CARD_SELECT + " WHERE c.user_id = ? ORDER BY c.due_date ASC",
+        _CARD_SELECT + " WHERE c.user_id = ? ORDER BY c.due_at ASC",
         (user_id,)
     ) as cur:
         rows = await cur.fetchall()
@@ -170,8 +196,10 @@ async def create_card(body: CreateCardIn):
         id=card.id, user_id=card.user_id, item_id=card.item_id,
         front=front, back=back,
         skill_id=ctx["skill_id"], skill_name=ctx["skill_name"], topic_name=ctx["header"],
-        ease_factor=card.ease_factor, interval=card.interval,
-        repetitions=card.repetitions, due_date=card.due_date.isoformat(),
+        stability=card.stability, difficulty=card.difficulty,
+        fsrs_state=card.fsrs_state, repetitions=card.repetitions, lapses=card.lapses,
+        interval_days=0,
+        due_date=card.due_at.date().isoformat(), due_at=card.due_at.isoformat(),
     )
 
 
@@ -203,7 +231,7 @@ async def backfill_cards(user_id: str = "default"):
 
 @router.post("/review", response_model=ReviewOut)
 async def submit_review(body: ReviewIn):
-    """Submit a review: update card schedule, log it, propagate to item mastery."""
+    """Submit a review: FSRS-reschedule the card, log it, propagate to item mastery."""
     db = await get_db()
 
     async with db.execute(
@@ -212,41 +240,52 @@ async def submit_review(body: ReviewIn):
         row = await cur.fetchone()
     if not row:
         raise HTTPException(404, f"Card {body.card_id} not found")
-    if not 0 <= body.quality <= 5:
-        raise HTTPException(422, "quality must be 0-5")
+    if body.rating not in (1, 2, 3, 4):
+        raise HTTPException(422, "rating must be 1-4 (Again/Hard/Good/Easy)")
 
     card = SRCard(
         id          = row["id"],
         user_id     = row["user_id"],
         item_id     = row["item_id"],
-        ease_factor = row["ease_factor"],
-        interval    = row["interval"],
+        stability   = row["stability"],
+        difficulty  = row["difficulty"],
+        fsrs_state  = row["fsrs_state"],
+        step        = row["step"],
         repetitions = row["repetitions"],
-        due_date    = date.fromisoformat(row["due_date"]),
+        lapses      = row["lapses"],
+        due_at      = _parse_dt(row["due_at"]) or _utc_now(),
+        last_review = _parse_dt(row["last_review"]),
     )
-    result = review_card(card, body.quality)
-    delta  = MASTERY_DELTA[body.quality]
+    result = review_card(card, body.rating)
+    delta  = MASTERY_DELTA[body.rating]
 
     # 1. Persist updated card state
     await db.execute(
         """UPDATE sr_cards
-           SET ease_factor = ?, interval = ?, repetitions = ?, due_date = ?,
-               last_review = datetime('now')
+           SET stability = ?, difficulty = ?, fsrs_state = ?, step = ?,
+               repetitions = ?, lapses = ?, due_at = ?, due_date = ?,
+               last_review = ?
            WHERE id = ?""",
-        (card.ease_factor, card.interval, card.repetitions,
-         card.due_date.isoformat(), card.id)
+        (card.stability, card.difficulty, card.fsrs_state, card.step,
+         card.repetitions, card.lapses,
+         card.due_at.isoformat(), card.due_at.date().isoformat(),
+         card.last_review.isoformat() if card.last_review else None,
+         card.id)
     )
-    # 2. Log the review
+    # 2. Log the review (rating stored in the quality column)
     await db.execute(
         """INSERT INTO sr_reviews
-           (card_id, user_id, quality, prev_ef, new_ef, prev_interval, new_interval, mastery_delta)
-           VALUES (?,?,?,?,?,?,?,?)""",
-        (result.card_id, row["user_id"], result.quality,
-         result.prev_ef, result.new_ef,
-         result.prev_interval, result.new_interval, delta)
+           (card_id, user_id, quality,
+            prev_stability, new_stability, prev_difficulty, new_difficulty,
+            prev_interval, new_interval, mastery_delta)
+           VALUES (?,?,?,?,?,?,?,?,?,?)""",
+        (result.card_id, row["user_id"], result.rating,
+         result.prev_stability, result.new_stability,
+         result.prev_difficulty, result.new_difficulty,
+         None, result.interval_days, delta)
     )
     # 3. Propagate to item mastery (same upsert shape as Rust practice flow)
-    correct = 1 if body.quality >= 3 else 0
+    correct = 1 if body.rating >= 2 else 0
     await db.execute(
         """INSERT INTO user_item_mastery
            (user_id, item_id, mastery, practice_count, correct_count, last_practiced)
@@ -286,10 +325,12 @@ async def submit_review(body: ReviewIn):
 
     return ReviewOut(
         card_id       = result.card_id,
-        quality       = result.quality,
-        new_ef        = result.new_ef,
-        new_interval  = result.new_interval,
-        due_date      = result.due_date.isoformat(),
+        rating        = result.rating,
+        stability     = result.new_stability,
+        difficulty    = result.new_difficulty,
+        interval_days = result.interval_days,
+        due_at        = result.due_at.isoformat(),
+        due_date      = result.due_at.date().isoformat(),
         again         = result.again,
         mastery_delta = delta,
         new_mastery   = new_mastery,
@@ -302,26 +343,29 @@ async def submit_review(body: ReviewIn):
 async def card_stats(user_id: str = "default"):
     """Return SR system statistics for the review UI / analytics dashboard."""
     db = await get_db()
-    today = date.today().isoformat()
+    now = _utc_now().isoformat()
     async with db.execute(
         "SELECT COUNT(*) as total FROM sr_cards WHERE user_id=?", (user_id,)
     ) as cur:
         r = await cur.fetchone()
     total = r["total"] if r else 0
     async with db.execute(
-        "SELECT COUNT(*) as due FROM sr_cards WHERE user_id=? AND due_date<=?",
-        (user_id, today)
+        "SELECT COUNT(*) as due FROM sr_cards WHERE user_id=? AND due_at<=?",
+        (user_id, now)
     ) as cur:
         r = await cur.fetchone()
     due = r["due"] if r else 0
     async with db.execute(
-        "SELECT AVG(ease_factor) as avg_ef FROM sr_cards WHERE user_id=?", (user_id,)
+        """SELECT AVG(stability) as avg_s, AVG(difficulty) as avg_d
+           FROM sr_cards WHERE user_id=? AND stability IS NOT NULL""",
+        (user_id,)
     ) as cur:
         r = await cur.fetchone()
-    avg_ef = (r["avg_ef"] if r else None) or 2.5
+    avg_s = (r["avg_s"] if r else None) or 0.0
+    avg_d = (r["avg_d"] if r else None) or 0.0
     async with db.execute(
         """SELECT COUNT(*) as reviews,
-                  AVG(CASE WHEN quality >= 3 THEN 1.0 ELSE 0.0 END) as pass_rate
+                  AVG(CASE WHEN quality >= 2 THEN 1.0 ELSE 0.0 END) as pass_rate
            FROM sr_reviews WHERE user_id=?""",
         (user_id,)
     ) as cur:
@@ -330,9 +374,10 @@ async def card_stats(user_id: str = "default"):
     pass_rate = r["pass_rate"] if r else None
 
     return {
-        "total_cards":     total,
-        "due_today":       due,
-        "avg_ease_factor": round(avg_ef, 3),
-        "total_reviews":   reviews,
-        "retention":       f"{round(pass_rate * 100)}%" if pass_rate is not None else "—",
+        "total_cards":    total,
+        "due_today":      due,
+        "avg_stability":  round(avg_s, 2),
+        "avg_difficulty": round(avg_d, 2),
+        "total_reviews":  reviews,
+        "retention":      f"{round(pass_rate * 100)}%" if pass_rate is not None else "—",
     }

@@ -2,7 +2,7 @@
 # SynthesisOverthrust v0.1.0-alpha — python_sidecar/main.py
 # Unified FastAPI sidecar — integrates all three phases:
 #   Phase 1: Foundation (vault, config)
-#   Phase 2: SM-2 · FAISS search · Ollama LLM · Analytics
+#   Phase 2: FSRS spaced repetition · FAISS search · Ollama LLM · Analytics
 #   Phase 3: Obsidian sync · Knowledge graph · Study rooms
 #             Plugin system · Git backup · Mobile API
 #
@@ -23,7 +23,7 @@ import structlog
 # Only mounted routers are imported — unmounted ones pull heavy deps
 # (sentence-transformers, websockets, …) and slow/blow up boot.
 # Re-enable each import together with its include_router below.
-from sm2.router      import router as sr_router
+from sr.router       import router as sr_router
 # from search.router   import router as search_router
 # from llm.router      import router as llm_router
 # from analytics.router import router as analytics_router

@@ -1,8 +1,8 @@
 # ============================================================
 # SynthesisOverthrust — tests/test_sr_flow.py
 # Integration: SR review → user_item_mastery → v_node_mastery.
-# Runs migrations 001 + 005 against in-memory SQLite and calls
-# the sm2 router endpoints directly.
+# Runs migrations 001 + 005 + 006 against in-memory SQLite and
+# calls the sr (FSRS) router endpoints directly.
 # Run: uv run pytest tests/ -v
 # ============================================================
 
@@ -17,7 +17,7 @@ import pytest
 from fastapi import HTTPException
 
 import db as db_module
-from sm2 import router as sr
+from sr import router as sr
 
 MIGRATIONS = Path(__file__).resolve().parents[2] / "migrations"
 
@@ -28,7 +28,7 @@ async def test_db(monkeypatch):
     conn.row_factory = aiosqlite.Row
     await conn.execute("PRAGMA foreign_keys = ON")
 
-    for fname in ("001_initial.sql", "005_spaced_repetition.sql"):
+    for fname in ("001_initial.sql", "005_spaced_repetition.sql", "006_fsrs.sql"):
         await conn.executescript((MIGRATIONS / fname).read_text())
 
     # Minimal skill tree: 1 skill → 1 topic → 2 items
@@ -94,7 +94,7 @@ async def test_review_propagates_to_mastery_and_node(test_db):
     await test_db.commit()
 
     card = await sr.create_card(sr.CreateCardIn(item_id=10))
-    out = await sr.submit_review(sr.ReviewIn(card_id=card.id, quality=5))
+    out = await sr.submit_review(sr.ReviewIn(card_id=card.id, rating=4))  # Easy
 
     assert out.again is False
     assert out.mastery_delta == 6
@@ -109,7 +109,7 @@ async def test_review_propagates_to_mastery_and_node(test_db):
         "SELECT quality, mastery_delta FROM sr_reviews WHERE card_id=?", (card.id,)
     ) as cur:
         log = await cur.fetchone()
-    assert log["quality"] == 5 and log["mastery_delta"] == 6
+    assert log["quality"] == 4 and log["mastery_delta"] == 6
 
     # Counters updated
     async with test_db.execute(
@@ -127,12 +127,12 @@ async def test_failed_review_decreases_mastery_and_resets(test_db):
     await test_db.commit()
 
     card = await sr.create_card(sr.CreateCardIn(item_id=10))
-    out = await sr.submit_review(sr.ReviewIn(card_id=card.id, quality=0))
+    out = await sr.submit_review(sr.ReviewIn(card_id=card.id, rating=1))  # Again
 
     assert out.again is True
-    assert out.new_interval == 1
-    assert out.mastery_delta == -4
-    assert await _mastery(test_db, 10) == 46
+    assert out.interval_days == 0     # relearning step, due again shortly
+    assert out.mastery_delta == -3
+    assert await _mastery(test_db, 10) == 47
 
 
 async def test_mastery_clamped_at_100(test_db):
@@ -142,19 +142,19 @@ async def test_mastery_clamped_at_100(test_db):
     await test_db.commit()
 
     card = await sr.create_card(sr.CreateCardIn(item_id=10))
-    out = await sr.submit_review(sr.ReviewIn(card_id=card.id, quality=5))
+    out = await sr.submit_review(sr.ReviewIn(card_id=card.id, rating=4))
     assert out.new_mastery == 100
 
 
 async def test_mastery_clamped_at_0(test_db):
     card = await sr.create_card(sr.CreateCardIn(item_id=10))
-    out = await sr.submit_review(sr.ReviewIn(card_id=card.id, quality=0))
+    out = await sr.submit_review(sr.ReviewIn(card_id=card.id, rating=1))
     assert out.new_mastery == 0
 
 
 async def test_review_unknown_card_404(test_db):
     with pytest.raises(HTTPException) as e:
-        await sr.submit_review(sr.ReviewIn(card_id="nope", quality=4))
+        await sr.submit_review(sr.ReviewIn(card_id="nope", rating=3))
     assert e.value.status_code == 404
 
 
@@ -189,8 +189,9 @@ async def test_backfill_skips_unpracticed_items(test_db):
 
 async def test_stats_shape(test_db):
     card = await sr.create_card(sr.CreateCardIn(item_id=10))
-    await sr.submit_review(sr.ReviewIn(card_id=card.id, quality=4))
+    await sr.submit_review(sr.ReviewIn(card_id=card.id, rating=3))
     stats = await sr.card_stats()
     assert stats["total_cards"] == 1
     assert stats["total_reviews"] == 1
     assert stats["retention"] == "100%"
+    assert "avg_stability" in stats and "avg_difficulty" in stats

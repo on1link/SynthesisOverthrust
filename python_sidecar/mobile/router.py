@@ -126,7 +126,7 @@ async def mobile_dashboard(authorization: Optional[str] = Header(None)):
 @router.get("/sr/due")
 async def mobile_sr_due(authorization: Optional[str] = Header(None), limit: int = 10):
     user_id = await _verify_key(authorization)
-    from sm2.router import get_due_cards
+    from sr.router import get_due_cards
     return await get_due_cards(user_id=user_id, limit=limit)
 
 
@@ -136,8 +136,8 @@ async def mobile_sr_review(
     authorization: Optional[str] = Header(None)
 ):
     await _verify_key(authorization)
-    from sm2.router import submit_review
-    from sm2.router import ReviewIn
+    from sr.router import submit_review
+    from sr.router import ReviewIn
     return await submit_review(ReviewIn(card_id=card_id, quality=quality))
 
 

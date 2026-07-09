@@ -8,30 +8,26 @@ dependencies = [
     # ── Web framework ─────────────────────────────────────────────────────────
     "fastapi>=0.111",
     "uvicorn[standard]>=0.30",
-
     # ── Settings ──────────────────────────────────────────────────────────────
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
-
     # ── Async SQLite ──────────────────────────────────────────────────────────
     "aiosqlite>=0.20",
-
     # ── Logging ───────────────────────────────────────────────────────────────
     "structlog>=24.1",
-
     # ── Phase 2: Intelligence ─────────────────────────────────────────────────
-    "sentence-transformers>=3.0",    # FAISS embeddings
-    "httpx>=0.27",                   # Ollama HTTP client (async)
-    "pymupdf>=1.24",                 # PDF text extraction (normalizado a minúsculas)
-
+    "sentence-transformers>=3.0", # FAISS embeddings
+    "httpx>=0.27", # Ollama HTTP client (async)
+    "pymupdf>=1.24", # PDF text extraction (normalizado a minúsculas)
     # ── Phase 3: Ecosystem ────────────────────────────────────────────────────
-    "networkx>=3.3",                 # Knowledge graph
-    "gitpython>=3.1",                # Git auto-backup
-    "watchdog>=4.0",                 # Vault file watcher
-    "websockets>=12.0",              # Study room WebSocket
-    "bcrypt>=4.2",                   # Mobile API key hashing
-    "scipy>=1.13",                   # Analytics forecasting
-    "pandas"
+    "networkx>=3.3", # Knowledge graph
+    "gitpython>=3.1", # Git auto-backup
+    "watchdog>=4.0", # Vault file watcher
+    "websockets>=12.0", # Study room WebSocket
+    "bcrypt>=4.2", # Mobile API key hashing
+    "scipy>=1.13", # Analytics forecasting
+    "pandas",
+    "fsrs>=6.3.1",
 ]
 
 [project.optional-dependencies]
