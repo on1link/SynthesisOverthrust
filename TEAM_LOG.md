@@ -172,3 +172,105 @@ bad card → 404; stats deliver avg_stability/avg_difficulty/retention 50%.
 - `test_beta.py` TestSM2 group now doubly stale after the sm2→sr rename (SO-D1).
 - Catalog chunks live in session scratchpad only; regenerate on demand with the
   split-by-`##` script (structure documented above).
+
+---
+
+## Backlog (guide-triaged 2026-07-09)
+
+Phase 1–3 audit found features that exist as code but are disconnected
+(views unrouted, Rust commands unregistered, sidecar routers unmounted).
+Guide triaged each:
+
+**Accepted into backlog** (rough PO order after SO-3):
+- **B1 Grind view** — route exists component; commands registered.
+- **B2 Projects view** — same shape as B1.
+- **B3 Vault view** — pairs with B10/B13.
+- **B4 Practice problems** — register commands + wire UI.
+- **B5 Learning resources** — register commands + UI.
+- **B6 Focus sessions** — register command + UI.
+- **B7 Agent assessments (L7+)** — large; PO must spec first (ties contexto P3).
+- **B8 AI Tutor (Ollama)** — mount llm router, proxies, view.
+- **B9 Analytics dashboard** — mount router; SQL must move to FSRS columns.
+- **B10 Semantic search over the Obsidian vault** — guide: vault lives in a
+  separate directory; scope FAISS/embeddings to that vault path, distinct from
+  the LanceDB catalog store.
+- **B11 Knowledge graph** — fix `graph/builder.py` (still queries `sr_cards.node_id`).
+- **B12 Git backup** — contexto §4 lists backups as settled.
+- **B13 Settings view** — without plugin section.
+- **B14 Obsidian vault sync** — sync only; no collab, no mobile.
+
+**Parked by guide:** Plugin manager UI (“no thoughts how to use it yet”),
+Study rooms (collab), Mobile REST API, Vitals view.
+
+---
+
+## Iteration 3 — Story SO-3: Catalog → LanceDB ingestion + retrieval API (P1)
+
+**Date:** 2026-07-09
+**Status:** DONE (QA passed)
+
+### Story SO-3
+
+> As the system, I can parse the full skill catalog, refine it, embed every
+> subtopic, store it in LanceDB with metadata, and answer semantic retrieval
+> queries through the sidecar — so agents later retrieve ~500 tokens instead
+> of reading a 218K-char file.
+
+**Acceptance criteria**
+1. Parser handles the real catalog: mixed `###`/`####` SKILL levels, `← NEW`
+   annotations stripped, metadata line (`Tier | Roles | Max Level | Prerequisites`),
+   bold-markdown bullets, role sections without skills (Career Track) skipped.
+2. Skills deduped across role sections by normalized name (roles unioned,
+   topics/subtopics merged); output = one record per unique subtopic with
+   {skill, topic, subtopic, tier, roles, max_level, prerequisites}.
+3. LanceDB table under `DATA_DIR/lancedb` holds subtopic embeddings + metadata
+   only — **no mastery/FSRS state** (§4 guardrail).
+4. Sidecar `/catalog/ingest` (re)builds the table; `/catalog/search?q=&k=&role=&tier=`
+   returns ranked matches; `/catalog/stats` reports counts.
+5. Embedder = sentence-transformers `all-MiniLM-L6-v2`, lazily imported;
+   tests inject a fake embedder (no model download in CI).
+6. Rust proxies registered; pytest green; live ingest + retrieval demo pass.
+
+**Catalog refinements applied (guide license 2026-07-09)**
+- AIE `Gen AI` renamed → `Generative AI & Large Language Models` so the
+  cross-role dedupe merges it with the MLE skill of the same name.
+- NEW topic **LLM Observability & Ops** added (tracing, cost/latency monitoring,
+  prompt versioning, production guardrails, semantic caching, feedback loops).
+- NEW subtopics: *Context engineering* (Prompting), *Constrained decoding*
+  (LLM Inference & Serving).
+- `ML Systems L9` → `ML Systems` (mastery level does not belong in a name).
+- Applied Fine-Tuning tier corrected `2T` → `2.5T` (sits under Tier 2.5).
+
+### Dev — Commits
+- `93b0b6d` feat: add curated skill catalog with LLM-era refinements
+- `d8e2003` feat: catalog ingestion into LanceDB with retrieval API (P1)
+- `cd9c06e` feat: register catalog_ingest/search/stats Tauri proxies
+
+### QA — Findings
+**Parse baseline (real file):** 87 unique skills / 442 topics / **2,549 subtopics**
+(contexto §6's "~1,200 across 53–56 skills" was stale). Tier histogram:
+F 404 · T1 712 · T2 883 · T2.5 320 · T3 103 · T4 127. Role codes found:
+AIE, ALL, DE, DS, EL, ENG, GER, GL, MLE — stored as data, never hardcoded.
+
+**pytest:** 76 passed (11 new catalog tests; fake embedder, no downloads).
+Same 15 pre-existing failures (SO-D1).
+
+**Live sidecar:** ingest 2,549 rows in ~11 s (MiniLM already cached);
+search-before-ingest → 409; empty q / k=99 → 422; bogus role → [].
+Retrieval spot-checks all semantically on-target:
+- "how does attention work in transformers" → FlashAttention internals /
+  self-attention (Gen AI & LLMs, T2.5)
+- "deploy LLM cheaply with quantization" + role=AIE → LLM deployment options,
+  edge compression
+- "window functions" + tier=F → SQL window function subtopics only
+- "monitoring LLM cost in production" → MLOps Observability tracing + token-cost
+  subtopics (pre-existing skill complements the new LLM Observability & Ops topic)
+
+**Rust:** `cargo check` clean.
+
+**Notes**
+- Catalog file now committed (was untracked) — single source for ingestion.
+- LanceDB dir: `DATA_DIR/lancedb` (`NF_LANCE_DIR` override); catalog path via
+  `NF_CATALOG_PATH`.
+- lancedb `table_names()` deprecation warning — cosmetic, revisit on upgrade.
+- No UI this story (P1 scope is the retrieval API); Skill Scout (P2) consumes it next.
