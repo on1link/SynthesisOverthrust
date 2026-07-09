@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     CHUNK_SIZE:  int  = 400     # tokens per chunk
     CHUNK_OVERLAP: int = 80
 
+    # ── Catalog / LanceDB ─────────────────────────────────────────────────────
+    LANCE_DIR:    str = str(Path.home() / f".local/share/{IDENTIFIER}/lancedb")
+    CATALOG_PATH: str = str(Path(__file__).resolve().parents[1] / "Synthesis Overthrust Catalog.md")
+
     # ── Syncthing (optional) ──────────────────────────────────────────────────
     SYNCTHING_URL:     str = "http://localhost:8384"
     SYNCTHING_API_KEY: str = ""
