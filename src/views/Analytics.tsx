@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from "react";
 import type { AnalyticsOverview } from "../api";
-import * as api from "../api";
+import { api } from "../api";
 import { C, F } from "../tokens";
 
 // ── Tiny chart helpers ────────────────────────────────────────────────────────
@@ -237,9 +237,9 @@ export default function Analytics() {
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {(data.top_skills ?? []).length > 0 ? (data.top_skills ?? []).map(s => {
               const pct = (s.level / 10) * 100;
-              const col = { mle: C.mle, de: C.de, ds: C.ds }[s.path_id] ?? C.accent;
+              const col = C.accent;
               return (
-                <div key={`${s.node_id}-${s.path_id}`} style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div key={s.node_id} style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{ fontFamily: F.display, fontSize: 13, fontWeight: 600, color: C.text, width: 140, flexShrink: 0 }}>{s.name}</div>
                   <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.border, overflow: "hidden" }}>
                     <div style={{ width: `${pct}%`, height: 6, borderRadius: 3, background: `linear-gradient(90deg,${col}bb,${col})`, boxShadow: `0 0 6px ${col}88`, transition: "width 0.6s ease" }} />
@@ -248,7 +248,7 @@ export default function Analytics() {
                     Lv.{s.level}
                   </div>
                   <div style={{ padding: "1px 6px", borderRadius: 4, background: `${col}1e`, color: col, fontSize: 9, fontWeight: 700, fontFamily: F.display, letterSpacing: 0.8 }}>
-                    {s.path_id.toUpperCase()}
+                    {`LV ${s.level}`}
                   </div>
                 </div>
               );
@@ -263,7 +263,7 @@ export default function Analytics() {
           {[
             { v: data.sr?.due_today ?? 0, l: "Due Today", col: C.purple },
             { v: data.sr?.retention ?? "—", l: "Retention Rate", col: C.green },
-            { v: (data.sr?.avg_quality ?? 0).toFixed(2), l: "Avg Quality", col: C.gold },
+            { v: (data.sr?.avg_rating ?? 0).toFixed(2), l: "Avg Rating", col: C.gold },
           ].map(({ v, l, col }) => (
             <div key={l} style={{ background: `linear-gradient(135deg,${C.surface},${col}0a)`, border: `1px solid ${col}33`, borderRadius: 12, padding: "20px 18px" }}>
               <div style={{ fontFamily: F.mono, fontSize: 30, color: col, fontWeight: 700 }}>{v}</div>
@@ -336,18 +336,18 @@ export default function Analytics() {
 const MOCK_DATA: AnalyticsOverview = {
   user: { xp: 2350, level: 3, sp: 8, streak: 12 },
   week: { xp_gained: 840, tasks_done: 9, tasks_created: 12, completion_rate: 75, grind_sessions: 5, grind_xp: 420 },
-  sr: { due_today: 4, avg_quality: 3.8, retention: "76%" },
+  sr: { due_today: 4, avg_rating: 3.1, retention: "76%" },
   sleep: { avg_hours: 7.2, avg_energy: 7.4 },
   xp_trend: Array.from({ length: 30 }, (_, i) => ({
     day: new Date(Date.now() - (29 - i) * 86400000).toISOString().slice(0, 10),
     xp: Math.round(Math.random() * 120 + 20),
   })),
   top_skills: [
-    { node_id: "pytorch", path_id: "mle", name: "PyTorch", level: 4 },
-    { node_id: "numpy", path_id: "mle", name: "NumPy", level: 3 },
-    { node_id: "stats", path_id: "mle", name: "Statistics", level: 2 },
-    { node_id: "sklearn", path_id: "mle", name: "Scikit-learn", level: 2 },
-    { node_id: "python", path_id: "mle", name: "Python", level: 4 },
+    { node_id: "pytorch", name: "PyTorch", level: 4 },
+    { node_id: "numpy", name: "NumPy", level: 3 },
+    { node_id: "stats", name: "Statistics", level: 2 },
+    { node_id: "sklearn", name: "Scikit-learn", level: 2 },
+    { node_id: "python", name: "Python", level: 4 },
   ],
   platform_stats: [
     { platform: "leetcode", sessions: 8, xp: 480 },

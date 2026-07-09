@@ -28,7 +28,7 @@ function buildNav(srDue: number): NavSection[] {
         { id: "sr", icon: "🧠", label: "Reviews", col: C.purple, badge: srDue > 0 ? srDue : undefined },
         { id: "scout", icon: "🔭", label: "Scout", col: C.teal },
         //      { id:"ai",        icon:"🤖", label:"AI Tutor", col:C.accent  },
-        // { id: "analytics", icon: "📈", label: "Analytics", col: C.gold },
+        { id: "analytics", icon: "📈", label: "Analytics", col: C.gold },
       ]
     },
     // {

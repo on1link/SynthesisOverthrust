@@ -464,4 +464,41 @@ since Phase 1 but queried tables NO migration ever created (`practice_problems`,
   first full-app validation lands with the next `tauri dev` session.
 
 ### Dev — Commits
-- (this commit) feat: learning loop — practice drills, resources, focus sessions (B4–B6)
+- `fdbbbae` feat: learning loop — practice drills, resources, focus sessions (B4–B6)
+
+---
+
+## Iteration 8 — Story SO-7: Analytics dashboard (B9)
+
+**Date:** 2026-07-09
+**Status:** DONE
+
+> As a learner, the Analytics view shows XP trends, SR health, skill velocity
+> and sleep correlation — computed from the FSRS-era schema.
+
+**Drift fixed (the router referenced three dead schema generations):**
+- `user_skill_levels` + `skill_node_defs` tables never existed → rewritten on
+  `v_node_mastery` JOIN `skills` (mastery is path-unscoped; `path_id` removed
+  from `SkillVelocity` per §9).
+- `sr_cards.node_id/path_id` → card→item→topic→skill join.
+- `activity_log.entry_type/description` → actual `action`/`node_id` columns
+  (skill XP now attributed via `node_id`, not `description LIKE`).
+- SM-2 retention math (`avg_quality/5`) → FSRS pass-rate (rating ≥ 2);
+  due queue on `due_at`.
+- `analytics_snapshots` table existed in no migration → `010_analytics_snapshots.sql`
+  (PK user_id+week_start). Applied its idempotent DDL to the prod DB directly
+  so the mounted router works before the next app boot (sqlx will no-op re-run).
+
+**Dev:** router mounted; 4 Rust proxies registered (`analytics_weekly_snapshot`
+corrected from GET-macro to POST); `api.ts` wrappers + wire-truth interfaces;
+`Analytics.tsx` de-drifted (import style, `avg_rating`, no path colors) and
+routed with sidebar entry. SO-D2 debt −1 view.
+
+**QA (live, real DB):** overview → due 25 / retention 75% / top skills from
+`v_node_mastery` ✓; skill-velocity → Calculus lv4, 4 reviews avg 2.5 (the
+QA reviews, proving the item→skill join) ✓; sleep-correlation → empty-data
+insight ✓; weekly snapshot → saved ✓. `cargo check` + `tsc` + `vite build`
+clean; pytest baseline unchanged (91/15). Services restarted per Q2.
+
+### Dev — Commits
+- (this commit) feat: analytics dashboard on FSRS-era schema (B9)

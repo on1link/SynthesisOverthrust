@@ -31,12 +31,12 @@ class WeeklySnapshot(BaseModel):
 
 class SkillVelocity(BaseModel):
     node_id:      str
-    path_id:      str
     name:         str
     level:        int
+    avg_mastery:  int
     xp_from_skill: int
     sr_reviews:   int
-    avg_quality:  float
+    avg_rating:   float   # FSRS rating 1-4
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -45,7 +45,6 @@ class SkillVelocity(BaseModel):
 async def analytics_overview(user_id: str = "default"):
     """Full analytics overview for the Analytics dashboard."""
     db    = await get_db()
-    today = date.today().isoformat()
     week_ago   = (date.today() - timedelta(days=7)).isoformat()
     month_ago  = (date.today() - timedelta(days=30)).isoformat()
 
@@ -81,18 +80,24 @@ async def analytics_overview(user_id: str = "default"):
     ) as cur:
         grind_row = await cur.fetchone()
 
-    # ── SR stats ───────────────────────────────────────────────────────────
+    # ── SR stats (FSRS: due_at queue, rating 1-4, pass = rating >= 2) ─────
+    from datetime import datetime, timezone
+    now_iso = datetime.now(timezone.utc).isoformat()
     async with db.execute(
-        "SELECT COUNT(*) as n FROM sr_cards WHERE user_id=? AND due_date<=?",
-        (user_id, today)
+        "SELECT COUNT(*) as n FROM sr_cards WHERE user_id=? AND due_at<=?",
+        (user_id, now_iso)
     ) as cur:
         sr_due = (await cur.fetchone())["n"]
 
     async with db.execute(
-        "SELECT AVG(quality) as avg_q FROM sr_reviews WHERE user_id=? AND reviewed_at>=?",
+        """SELECT AVG(quality) as avg_q,
+                  AVG(CASE WHEN quality >= 2 THEN 1.0 ELSE 0.0 END) as pass_rate
+           FROM sr_reviews WHERE user_id=? AND reviewed_at>=?""",
         (user_id, week_ago)
     ) as cur:
-        avg_q = (await cur.fetchone())["avg_q"] or 0
+        sr_row = await cur.fetchone()
+    avg_q = sr_row["avg_q"] or 0
+    pass_rate = sr_row["pass_rate"]
 
     # ── Sleep stats ────────────────────────────────────────────────────────
     async with db.execute(
@@ -110,13 +115,13 @@ async def analytics_overview(user_id: str = "default"):
     ) as cur:
         xp_trend = [{"day": r["day"], "xp": r["xp"]} for r in await cur.fetchall()]
 
-    # ── Top skills by total level ──────────────────────────────────────────
+    # ── Top skills by computed level (v_node_mastery drives levels) ───────
     async with db.execute(
-        """SELECT n.node_id, n.path_id, d.name, n.level
-           FROM user_skill_levels n
-           JOIN skill_node_defs d ON d.id=n.node_id AND d.path_id=n.path_id
-           WHERE n.user_id=? AND n.level>0
-           ORDER BY n.level DESC LIMIT 8""",
+        """SELECT v.node_id, s.name, v.computed_level as level, v.avg_mastery
+           FROM v_node_mastery v
+           JOIN skills s ON s.id = v.node_id
+           WHERE v.user_id=? AND v.avg_mastery>0
+           ORDER BY v.avg_mastery DESC LIMIT 8""",
         (user_id,)
     ) as cur:
         top_skills = [dict(r) for r in await cur.fetchall()]
@@ -141,9 +146,9 @@ async def analytics_overview(user_id: str = "default"):
             "grind_xp":       int(grind_row["xp"] or 0),
         },
         "sr": {
-            "due_today":   sr_due,
-            "avg_quality": round(float(avg_q), 2),
-            "retention":   f"{min(100, round(float(avg_q)/5*100))}%",
+            "due_today":  sr_due,
+            "avg_rating": round(float(avg_q), 2),
+            "retention":  f"{round(pass_rate * 100)}%" if pass_rate is not None else "—",
         },
         "sleep": {
             "avg_hours":  round(float(sleep_row["avg_h"] or 0), 1),
@@ -162,44 +167,45 @@ async def skill_velocity(user_id: str = "default"):
     month_ago = (date.today() - timedelta(days=30)).isoformat()
 
     async with db.execute(
-        """SELECT usl.node_id, usl.path_id, d.name, usl.level
-           FROM user_skill_levels usl
-           JOIN skill_node_defs d ON d.id=usl.node_id AND d.path_id=usl.path_id
-           WHERE usl.user_id=? AND usl.level>0 ORDER BY usl.updated_at DESC""",
+        """SELECT v.node_id, s.name, v.computed_level as level, v.avg_mastery
+           FROM v_node_mastery v
+           JOIN skills s ON s.id = v.node_id
+           WHERE v.user_id=? AND v.avg_mastery>0
+           ORDER BY v.avg_mastery DESC""",
         (user_id,)
     ) as cur:
         skills = await cur.fetchall()
 
     result = []
     for sk in skills:
-        # XP earned from this skill
+        # XP attributed to this skill (activity_log carries node_id)
         async with db.execute(
             """SELECT SUM(xp) as total FROM activity_log
-               WHERE user_id=? AND entry_type='skill_up' AND description LIKE ?
-               AND created_at>=?""",
-            (user_id, f"%{sk['name']}%", month_ago)
+               WHERE user_id=? AND node_id=? AND created_at>=?""",
+            (user_id, sk["node_id"], month_ago)
         ) as cur:
             skill_xp = (await cur.fetchone())["total"] or 0
 
-        # SR review stats for this skill
+        # SR review stats for this skill (card → item → topic → skill)
         async with db.execute(
-            """SELECT COUNT(*) as n, AVG(quality) as avg_q
+            """SELECT COUNT(*) as n, AVG(r.quality) as avg_q
                FROM sr_reviews r
-               JOIN sr_cards c ON c.id=r.card_id
-               WHERE c.user_id=? AND c.node_id=? AND c.path_id=?
-               AND r.reviewed_at>=?""",
-            (user_id, sk["node_id"], sk["path_id"], month_ago)
+               JOIN sr_cards c ON c.id = r.card_id
+               JOIN topic_items ti ON ti.id = c.item_id
+               JOIN topics t ON t.id = ti.topic_id
+               WHERE c.user_id=? AND t.skill_id=? AND r.reviewed_at>=?""",
+            (user_id, sk["node_id"], month_ago)
         ) as cur:
             sr_row = await cur.fetchone()
 
         result.append(SkillVelocity(
             node_id      = sk["node_id"],
-            path_id      = sk["path_id"],
             name         = sk["name"],
             level        = sk["level"],
+            avg_mastery  = sk["avg_mastery"],
             xp_from_skill = int(skill_xp),
             sr_reviews   = sr_row["n"] or 0,
-            avg_quality  = round(float(sr_row["avg_q"] or 0), 2),
+            avg_rating   = round(float(sr_row["avg_q"] or 0), 2),
         ))
 
     return sorted(result, key=lambda x: x.xp_from_skill, reverse=True)

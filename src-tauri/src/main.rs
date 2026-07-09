@@ -266,6 +266,11 @@ fn main() {
             commands_p2::catalog_ingest,
             commands_p2::catalog_search,
             commands_p2::catalog_stats,
+            // ── Phase 2 — Analytics ─────────────────────────────────────────
+            commands_p2::analytics_overview,
+            commands_p2::analytics_skill_velocity,
+            commands_p2::analytics_sleep_correlation,
+            commands_p2::analytics_weekly_snapshot,
             // ── Phase 2 — Skill Scout ───────────────────────────────────────
             commands_p2::scout_run,
             commands_p2::scout_proposals,

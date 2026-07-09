@@ -221,7 +221,13 @@ proxy_get!(llm_list_models, "/llm/models");
 proxy_get!(analytics_overview, "/analytics/overview");
 proxy_get!(analytics_skill_velocity, "/analytics/skill-velocity");
 proxy_get!(analytics_sleep_correlation, "/analytics/sleep-correlation");
-proxy_get!(analytics_weekly_snapshot, "/analytics/snapshot/weekly");
+
+#[tauri::command]
+pub async fn analytics_weekly_snapshot() -> Result<Value> {
+    post("/analytics/snapshot/weekly", json!({}))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
 
 // ════════════════════════════════════════════════════════════════════════════
 // SIDECAR MANAGEMENT

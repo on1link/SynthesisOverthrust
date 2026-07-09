@@ -142,10 +142,10 @@ export const api = {
   // llmIngestPaper: (file_path: string, write_to_vault?: boolean) => invoke<PaperDigest>("llm_ingest_paper", { file_path, write_to_vault }),
   // llmListModels: () => invoke<string[]>("llm_list_models"),
 
-  // analyticsOverview: () => invoke<AnalyticsOverview>("analytics_overview"),
-  // analyticsSkillVelocity: () => invoke<SkillVelocity[]>("analytics_skill_velocity"),
-  // analyticsSleepCorrelation: () => invoke<SleepCorrelation>("analytics_sleep_correlation"),
-  // analyticsWeeklySnapshot: () => invoke<WeeklySnapshot>("analytics_weekly_snapshot"),
+  analyticsOverview: () => invoke<AnalyticsOverview>("analytics_overview"),
+  analyticsSkillVelocity: () => invoke<SkillVelocity[]>("analytics_skill_velocity"),
+  analyticsSleepCorrelation: (_days?: number) => invoke<SleepCorrelation>("analytics_sleep_correlation"),
+  analyticsSnapshot: () => invoke<{ week_start: string; xp_gained: number; snapshot: string }>("analytics_weekly_snapshot"),
 
   sidecarStatus: () => invoke<{ alive: boolean }>("sidecar_status"),
   sidecarRestart: () => invoke<void>("sidecar_restart"),
@@ -511,10 +511,17 @@ export interface ChatMsg { role: "user" | "assistant" | "system"; content: strin
 export interface LlmResponse { content: string; model: string; }
 export interface LlmPracticeResult { problem: string; hints: string[]; solution?: string; }
 export interface PaperDigest { title: string; summary: string; key_concepts: string[]; vault_path?: string; }
-export interface AnalyticsOverview { total_xp: number; level: number; streak: number; tasks_done: number; notes_indexed: number; sr_cards: number; }
-export interface SkillVelocity { node_id: string; name: string; path_id: string; xp_delta: number; level: number; }
-export interface SleepCorrelation { pearson_r: number; data_points: number; interpretation: string; }
-export interface WeeklySnapshot { week_start: string; xp: number; tasks_done: number; grind_sessions: number; sr_reviews: number; }
+export interface AnalyticsOverview {
+  user: { xp: number; level: number; sp: number; streak: number };
+  week: { xp_gained: number; tasks_done: number; tasks_created: number; completion_rate: number; grind_sessions: number; grind_xp: number };
+  sr: { due_today: number; avg_rating: number; retention: string };
+  sleep: { avg_hours: number; avg_energy: number };
+  xp_trend: { day: string; xp: number }[];
+  top_skills: { node_id: string; name: string; level: number; avg_mastery?: number }[];
+  platform_stats: { platform: string; sessions: number; xp: number }[];
+}
+export interface SkillVelocity { node_id: string; name: string; level: number; avg_mastery: number; xp_from_skill: number; sr_reviews: number; avg_rating: number; }
+export interface SleepCorrelation { points: { date: string; hours: number; quality: number; energy: number; next_day_xp: number }[]; corr_hours_xp: number; corr_quality_xp: number; insight: string; }
 
 // ── Phase 3 ───────────────────────────────────────────────────────────────────
 export interface GraphData { nodes: GraphNode[]; links: GraphLink[]; }
