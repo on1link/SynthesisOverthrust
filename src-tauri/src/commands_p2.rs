@@ -21,7 +21,7 @@ macro_rules! proxy_get {
 }
 
 // ════════════════════════════════════════════════════════════════════════════
-// SPACED REPETITION (SM-2)
+// SPACED REPETITION (FSRS)
 // ════════════════════════════════════════════════════════════════════════════
 
 #[tauri::command]
@@ -50,8 +50,8 @@ pub async fn sr_create_card(
 }
 
 #[tauri::command]
-pub async fn sr_submit_review(card_id: String, quality: u8) -> Result<Value> {
-    post("/sr/review", json!({"card_id":card_id,"quality":quality}))
+pub async fn sr_submit_review(card_id: String, rating: u8) -> Result<Value> {
+    post("/sr/review", json!({"card_id":card_id,"rating":rating}))
         .await
         .map_err(|e| NfError::Sidecar(e.to_string()))
 }
