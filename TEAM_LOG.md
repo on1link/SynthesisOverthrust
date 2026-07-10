@@ -948,3 +948,100 @@ vite build OK.
 - Sidebar Intelligence now: Reviews · Scout · AI Tutor · Graph · Analytics.
 - Remaining backlog: B7b, B12 git backup, B13 settings, B14 obsidian sync
   (unlocks D28 concept edges + watcher rewrite debt).
+
+---
+
+## Iteration 15 — Story SO-13: git backup (B12)
+
+**Date:** 2026-07-10
+**Status:** DONE (QA passed; UI walkthrough in `tauri dev` pending a display session)
+
+> As a learner, my progression data is backed up: consistent SQLite
+> snapshots committed to a local git repo, on demand and nightly, with
+> history visible in the app.
+
+**Drift found (§6.6):**
+- `backup/router.py` hardcodes the LEGACY data dir
+  (`~/.local/share/synthesis-overthrust`, pre-rename) in four endpoints —
+  a stray git repo would land next to, not in, the real
+  `com.synthesisoverthrust.app` dir. `settings.BACKUP_DIR` exists and is
+  correct; only `/status` half-used it behind a needless hasattr.
+- `snapshot_db` copies the LIVE WAL database with `shutil.copy2` —
+  torn-copy risk mid-write.
+- Rust `backup_set_remote` proxy posts to `/backup/set-remote` which does
+  not exist in the router.
+- Nothing mounted/registered; `ensure_git_repo` lifespan call commented.
+- `.gitignore` written at init would commit the live DB and the whole
+  LanceDB dir (rebuildable binary churn).
+
+**Acceptance criteria**
+1. Router mounted; `ensure_git_repo` on lifespan (failure-guarded); every
+   endpoint uses `settings.BACKUP_DIR`/`settings.DB_PATH`.
+2. Snapshots use the sqlite3 online-backup API (consistent under WAL);
+   retention 10; snapshot logs to `backup_log` (`backup_type='snapshot'`).
+3. `/commit` snapshots first, then stages+commits; `.gitignore` excludes
+   the live DB (+wal/shm) and `lancedb/`, keeps `snapshots/`.
+4. New endpoints: `POST /backup/set-remote` (matches the existing Rust
+   proxy) and `GET /backup/snapshots` (name, size, sha256, created — wire
+   truth ready for the B13 restore UI).
+5. Rust: all backup proxies registered; midnight scheduler triggers a
+   commit when `config.auto_git_commit='true'` (startup trigger already
+   existed).
+6. api.ts wrappers enabled; BackupCard in the Vault view: status
+   (branch/dirty/last commit), Backup Now, snapshot count, remote
+   set + push.
+7. pytest offline (tmp dirs; GitPython local ops; push against a
+   `file://` bare repo — no network).
+
+**Decisions**
+- **D29 — durable artifact = consistent snapshots, not the live DB**:
+  live db + WAL sidecars + `lancedb/` gitignored (racy / rebuildable);
+  `snapshots/` committed.
+- **D30 — all backup paths from settings** (legacy hardcoded dir was the
+  §6.6 offender).
+- **D31 — nightly backup piggybacks the existing Rust midnight
+  scheduler** behind the `auto_git_commit` config key; no new cron
+  machinery.
+- **D32 — restore UI deferred to B13** (needs a restart flow); the
+  snapshots-list endpoint ships its wire truth (incl. sha256 integrity
+  hashes per contexto §4) now.
+- Syncthing endpoints stay unregistered (B13 material).
+
+### Dev — Commits
+- `cc2ff39` fix: de-drift git backup onto real paths + consistent snapshots
+  (Phase A, Sonnet 5 executor)
+- `0492ad9` feat: backup proxies, nightly trigger, BackupCard in Vault
+  (Phase B, Sonnet 5 executor)
+
+### QA — Findings (Fable)
+**Executor mismatches — both good catches:**
+1. Plan's "second commit → nothing_to_commit" test was unreachable by the
+   plan's own design (every /commit stages a fresh snapshot). Architect
+   accepted **always-commits semantics** — Backup Now always yields a
+   backup; test documents it. Executor also added microsecond snapshot
+   names (second-resolution names silently overwrote rapid backups) and an
+   explicit push refspec (fresh branch has no upstream; file:// push
+   failed without it).
+2. Pre-existing `backup_snapshot_db` proxy was GET against a POST route —
+   flagged in Phase B, fixed by architect before it shipped registered.
+
+**pytest:** 150 passed (8 new backup tests: init+gitignore, commit flow
+with dual backup_log rows, snapshot consistency via marker row, retention
+10, sha256 listing, file:// remote push, 422 empty url). Same 15
+pre-existing (SO-D1).
+
+**Live (QA sidecar with NF_BACKUP_DIR scoped to scratch — lifespan would
+otherwise git-init the prod dir; Q1/Q2 observed):** repo + D29 .gitignore
+auto-created on boot; commit → snapshot (536 KB) + git hash, 2 backup_log
+rows; snapshots list with sha256; status branch=main clean; set-remote +
+push → commit visible in a bare file:// remote; snapshot passes
+`PRAGMA integrity_check` and reads all 92 topic_items.
+
+**Rust/TS:** cargo 0 errors; tsc clean on touched files; vite build OK.
+
+**Notes**
+- Live QA for future backup work MUST scope `NF_BACKUP_DIR` — the sidecar
+  git-inits `settings.BACKUP_DIR` (prod data dir) on every boot now. Prod
+  init is intended behavior for the app itself.
+- Remaining backlog: B7b, B13 settings (restore UI per D32 + Syncthing),
+  B14 obsidian sync.
