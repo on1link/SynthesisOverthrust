@@ -41,10 +41,14 @@ stop() {
   local file_pid
   file_pid=$(cat "$PID_FILE" 2>/dev/null || true)
   if [ -n "$file_pid" ] && kill -0 "$file_pid" 2>/dev/null; then
+    # SO-D6: the pidfile may hold a wrapper (uv) — kill its children too,
+    # or the uvicorn child survives as an orphan still bound to the port.
+    pkill -P "$file_pid" 2>/dev/null || true
     kill "$file_pid" 2>/dev/null
     sleep 1
+    pkill -9 -P "$file_pid" 2>/dev/null || true
     kill -9 "$file_pid" 2>/dev/null || true
-    echo "stopped pid $file_pid"
+    echo "stopped pid $file_pid (and children)"
   else
     echo "no pidfile-owned sidecar running"
   fi
@@ -72,6 +76,11 @@ start() {
   for _ in $(seq 1 10); do
     sleep 1
     if curl -sf -m 2 "http://localhost:$PORT/health" > /dev/null 2>&1; then
+      # SO-D6: re-point the pidfile at the ACTUAL port owner (uv wraps
+      # uvicorn — $! is the wrapper, not the server).
+      local real
+      real=$(owner_pid || true)
+      [ -n "${real:-}" ] && echo "$real" > "$PID_FILE"
       echo "up pid=$(cat "$PID_FILE") db=${db:-<default prod>} log=$LOG_FILE"
       return 0
     fi
