@@ -827,3 +827,41 @@ Ollama-down 503; SR cap regression). Same 15 pre-existing (SO-D1).
   question-JSON garbling and grading variance on 3B models.
 - **B7b**: two-agent 48h-gap certification (contexto L9–L10/T6) —
   `assessments.kind='dual'` reserved.
+
+---
+
+## Iteration 13 — Defect fixes SO-D5 (assessment hardening) + SO-D6 (sidecar orphans)
+
+**Date:** 2026-07-10
+**Status:** DONE
+
+Small-logic defect iteration — under the 50-LOC Layer-4 routing threshold
+(mostly prompt copy), so Fable executed directly.
+
+**SO-D5 fix (`8c97fbc`):**
+- Generation prompt: ASCII-math-only rule (x^2, sqrt(x), infinity — never
+  LaTeX/unicode math) + self-contained-question rule.
+- `_valid_questions` gate (exact count, ≥8-word questions, no mojibake) with
+  **one corrective retry** feeding the bad output back, then 502 with no row.
+- Grading: anchored rubric bands (90+/70+/40+/0, content-not-style) and a
+  charitable ≥60 floor for reasonable attempts at malformed questions;
+  stray verdict scores clamp into 0–100 (150→100, "90"→90, None→0).
+- `ASSESS_MODEL` setting — route assessments to a stronger model than the
+  chat default (docs: prefer ≥7B; llama3.2:3b graded a correct answer 20).
+- Tests: 4 new (retry path incl. corrective message, 502 on double garble,
+  ASSESS_MODEL routing, score clamping) → suite **134 passed** / same 15.
+- Live re-check on the SAME 3B model that garbled in iteration 12: 4/4
+  well-posed ASCII questions, zero LaTeX/unicode violations.
+
+**SO-D6 found & fixed (`dcf0c1a`)** — a Q1 WARNING during this iteration
+exposed it: `sidecar.sh` captured `$!` = the **uv wrapper** pid, so `stop`
+killed the wrapper and orphaned the uvicorn child still bound to 7731.
+Three orphaned pairs from earlier iterations were identified (all serving
+session QA DBs — killed after evidence check; the foreign pid on 8022 was
+left alone). Fix: after the readiness poll, the pidfile is re-pointed at the
+actual port owner (`ss`-derived); `stop` also `pkill -P`'s children.
+Verified: pidfile == port owner, stop leaves zero orphans, port free.
+
+### Dev — Commits
+- `8c97fbc` fix: harden assessment generation and grading (SO-D5)
+- `dcf0c1a` fix: sidecar.sh pidfile tracked the uv wrapper, not uvicorn (SO-D6)
