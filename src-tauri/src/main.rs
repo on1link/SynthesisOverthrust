@@ -292,6 +292,12 @@ fn main() {
             commands_p2::assess_submit,
             commands_p2::assess_active,
             commands_p2::assess_history,
+            // ── Phase 3 — Knowledge graph (B11) ─────────────────────────────
+            commands_p3::graph_data,
+            commands_p3::graph_stats,
+            commands_p3::graph_neighbours,
+            commands_p3::graph_find_path,
+            commands_p3::graph_rebuild,
         ])
         .build(tauri::generate_context!())
         .expect("SynthesisOverthrust failed to build");

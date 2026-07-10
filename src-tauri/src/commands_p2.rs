@@ -326,8 +326,8 @@ pub async fn sidecar_restart(app: tauri::AppHandle) -> Result<()> {
         .map_err(|e| NfError::Sidecar(e.to_string()))
 }
 
-// Helper: URL encode
-mod urlencoding {
+// Helper: URL encode (shared with commands_p3)
+pub(crate) mod urlencoding {
     pub fn encode(s: &str) -> String {
         s.chars()
             .map(|c| match c {

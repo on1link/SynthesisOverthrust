@@ -4,6 +4,7 @@
 // mobile API key management. Proxy to Python sidecar.
 // ============================================================
 
+use crate::commands_p2::urlencoding;
 use crate::error::{NfError, Result};
 use crate::sidecar::{get, post};
 use serde_json::{Value, json};
@@ -80,23 +81,39 @@ pub async fn sync_resolve(note_path: String, resolution: String) -> Result<Value
 // KNOWLEDGE GRAPH
 // ════════════════════════════════════════════════════════════════════════════
 
+// Wire truth: python_sidecar/graph/router.py — /rebuild is POST; node ids
+// contain ':' and '/' (note paths), so query args must be urlencoded.
+
 proxy_get!(graph_data, "/graph/data");
 proxy_get!(graph_stats, "/graph/stats");
-proxy_get!(graph_rebuild, "/graph/rebuild");
 
 #[tauri::command]
-pub async fn graph_neighbours(node_id: String, depth: Option<u32>) -> Result<Value> {
-    let d = depth.unwrap_or(2);
-    get(&format!("/graph/neighbours/{node_id}?depth={d}"))
+pub async fn graph_rebuild() -> Result<Value> {
+    post("/graph/rebuild", json!({}))
         .await
         .map_err(|e| NfError::Sidecar(e.to_string()))
 }
 
 #[tauri::command]
+pub async fn graph_neighbours(node_id: String, depth: Option<u32>) -> Result<Value> {
+    let d = depth.unwrap_or(2);
+    get(&format!(
+        "/graph/neighbours/{}?depth={d}",
+        urlencoding::encode(&node_id)
+    ))
+    .await
+    .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
 pub async fn graph_find_path(src: String, dst: String) -> Result<Value> {
-    get(&format!("/graph/path?src={src}&dst={dst}"))
-        .await
-        .map_err(|e| NfError::Sidecar(e.to_string()))
+    get(&format!(
+        "/graph/path?src={}&dst={}",
+        urlencoding::encode(&src),
+        urlencoding::encode(&dst)
+    ))
+    .await
+    .map_err(|e| NfError::Sidecar(e.to_string()))
 }
 
 // ════════════════════════════════════════════════════════════════════════════
