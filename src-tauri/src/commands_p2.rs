@@ -171,46 +171,75 @@ proxy_get!(scout_fewshot, "/scout/fewshot");
 // LLM / OLLAMA
 // ════════════════════════════════════════════════════════════════════════════
 
+// Wire truth: pydantic models in python_sidecar/llm/router.py (ChatIn,
+// PracticeIn, ExplainIn). context_type "vault" → 501 until B10 (D11).
+
 #[tauri::command]
 pub async fn llm_chat(
     messages: Vec<Value>,
     model: Option<String>,
-    vault_context: Option<bool>,
+    context_type: Option<String>,
+    skill_id: Option<String>,
+    session_id: Option<String>,
 ) -> Result<Value> {
     post(
         "/llm/chat",
-        json!({"messages":messages,"model":model,"vault_context":vault_context.unwrap_or(true)}),
+        json!({
+            "messages": messages,
+            "model": model,
+            "context_type": context_type.unwrap_or_else(|| "general".into()),
+            "skill_id": skill_id,
+            "session_id": session_id,
+        }),
     )
     .await
     .map_err(|e| NfError::Sidecar(e.to_string()))
 }
 
 #[tauri::command]
-pub async fn llm_practice(skill_id: String, difficulty: Option<String>) -> Result<Value> {
+pub async fn llm_practice(
+    subtopic_id: String,
+    path_id: String,
+    difficulty: Option<String>,
+    count: Option<u32>,
+    model: Option<String>,
+) -> Result<Value> {
     post(
         "/llm/practice",
-        json!({"skill_id":skill_id,"difficulty":difficulty.unwrap_or_else(||"medium".into())}),
+        json!({
+            "subtopic_id": subtopic_id,
+            "path_id": path_id,
+            "difficulty": difficulty.unwrap_or_else(|| "medium".into()),
+            "count": count.unwrap_or(3),
+            "model": model,
+        }),
     )
     .await
     .map_err(|e| NfError::Sidecar(e.to_string()))
 }
 
 #[tauri::command]
-pub async fn llm_explain(concept: String, context: Option<String>) -> Result<Value> {
-    post("/llm/explain", json!({"concept":concept,"context":context}))
-        .await
-        .map_err(|e| NfError::Sidecar(e.to_string()))
-}
-
-#[tauri::command]
-pub async fn llm_ingest_paper(file_path: String, write_to_vault: Option<bool>) -> Result<Value> {
+pub async fn llm_explain(
+    concept: String,
+    target_level: Option<String>,
+    analogy_domain: Option<String>,
+    model: Option<String>,
+) -> Result<Value> {
     post(
-        "/llm/paper-digest",
-        json!({"file_path":file_path,"write_to_vault":write_to_vault.unwrap_or(true)}),
+        "/llm/explain",
+        json!({
+            "concept": concept,
+            "target_level": target_level.unwrap_or_else(|| "intermediate".into()),
+            "analogy_domain": analogy_domain,
+            "model": model,
+        }),
     )
     .await
     .map_err(|e| NfError::Sidecar(e.to_string()))
 }
+
+// llm_ingest_paper deferred with the vault slice (D12) — the old proxy sent
+// {file_path} to an endpoint expecting {text}; rebuild alongside B10/B14.
 
 proxy_get!(llm_list_models, "/llm/models");
 

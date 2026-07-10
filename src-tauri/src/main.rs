@@ -276,6 +276,11 @@ fn main() {
             commands_p2::scout_proposals,
             commands_p2::scout_decide,
             commands_p2::scout_fewshot,
+            // ── Phase 2 — AI Tutor (Ollama, B8) ─────────────────────────────
+            commands_p2::llm_chat,
+            commands_p2::llm_practice,
+            commands_p2::llm_explain,
+            commands_p2::llm_list_models,
         ])
         .build(tauri::generate_context!())
         .expect("SynthesisOverthrust failed to build");
