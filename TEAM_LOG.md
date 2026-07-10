@@ -605,3 +605,88 @@ before any call):**
   stale (009 does); comment-only, no action.
 - Ollama default model in sidecar config is `llama3` (installed ✓); UI model
   picker lists all local tags.
+
+---
+
+## Iteration 10 — Story SO-9: Skills/Scout GUI fixes (user-reported)
+
+**Date:** 2026-07-10
+**Status:** DONE
+
+> As a learner, the Skills view shows every catalog role, a Scout approval
+> becomes a visible skill node, and the Scout list can be filtered and sorted.
+
+**Root causes (user reported all three symptoms):**
+1. **Roles missing** — `roles` table held exactly one row (`mle`); 004 never
+   seeded the rest. The UI renders whatever the backend returns. Catalog has
+   6 real roles (MLE, DS, DE, AIE, GL German Language, EL English Language);
+   metadata codes GER/ENG are alias spellings of GL/EL, `ALL` is a wildcard.
+2. **Approved Scout proposals invisible** — approve wrote `skills/topics/
+   topic_items` but never `skill_roles` (Skills view INNER JOINs it → skill
+   dropped) and left `difficulty_id` NULL (matches no tier section). Tier and
+   roles went to LanceDB only.
+3. **No sort/filter in Scout** — UI hardcoded `scoutProposals("pending")`.
+
+**Decisions**
+- **D15 — catalog is the source of truth for the SQLite tree's role layer**:
+  new `/catalog/sync-tree` (also auto-runs after `/catalog/ingest`) mirrors
+  role rows (display names parsed from catalog section headers), skill_roles
+  links and difficulty_id from LanceDB `skill_meta()`. Idempotent.
+- **D16 — role code normalization is data, not logic**: GER→GL, ENG→EL,
+  ALL→every known role (`catalog/sync.py`), shared by sync-tree and the
+  Scout approve path.
+- **D17 — three seeded skills carry explicit catalog aliases**
+  (`skill_deep_learning`→`deep_learning`, `skill_genai_llm`→
+  `generative_ai_large_language_models`, `skill_adv_pytorch`→
+  `advanced_deep_learning_frameworks_pytorch_core`) — abbreviated seed names
+  defeat normalized-name matching; tiers verified equal before aliasing.
+
+### Dev — Commits
+- `43ab975` fix: mirror catalog roles/links/tiers into SQLite tree (SO-9)
+- `3296ece` feat: Scout list filters/sort + catalog sync action in Skills (SO-9)
+
+### QA — Findings
+**pytest:** 110 passed (4 new: approve links roles+tier, alias+wildcard
+normalization, sync-tree match/idempotency, 409 before ingest). Same 15
+pre-existing (SO-D1).
+
+**Live (QA DB via sidecar.sh, Q1 verified):** ingest → 2,549 rows,
+`tree_sync {roles_created 5, links_created 21, matched 14/17}`; after D17
+aliases re-sync → **17/17 matched, 42 skill_roles links, 6 roles** with
+catalog display names. Scout approve with `roles="GER,ALL"` →
+`generative_ai_large_language_models` visible through the exact Skills-view
+JOIN under all 6 roles at `tier_2_5t` (GER folded to gl, ALL expanded).
+Second sync run → all-zero counts (idempotent). `cargo check`/`tsc`/`vite
+build` clean on touched files. Services stopped after QA (Q2).
+
+**Notes**
+- Prod DB effect on first sync (user runs it via ⇄ SYNC CATALOG or next
+  ingest): +5 role rows, ~25 skill_roles links, tiers for the 4 scout-created
+  skills (they become visible retroactively — including QA item 8189's skill).
+- `useGameState.ts` still has an `"mle"` fallback when roles is empty —
+  moot once roles exist; cleanup candidate.
+
+---
+
+## Iteration 11 — Story SO-10: vault semantic search (B10)
+
+**Date:** 2026-07-10
+**Status:** IN PROGRESS
+
+> As a learner, I search my Obsidian vault semantically from the Vault view,
+> and the AI tutor answers with my own notes as context (unlocks D11).
+
+**Decisions**
+- **D18 — LanceDB over FAISS for vault search**: rebuild `search/` on the
+  catalog store pattern (own table `vault_chunks`, injectable embedder,
+  main deps only). The written-but-unmounted FAISS module needed the
+  optional `faiss-cpu` extra, assumed `vault_index` columns that no
+  migration created (tags/content_hash), and had a staleness bug. FAISS
+  files deleted; `sync/watcher._re_embed_note` must be rewritten for B14.
+- **D19 — vault path read from the shared `config` table** (key
+  `vault_path`, written by Rust `set_vault_path`), `NF_VAULT_PATH` as
+  fallback; 409 with hint when unset.
+- **D20 — full rebuild on `/search/reindex`** (no incremental); catalog's
+  2.5k rows embed in ~11 s, vaults are smaller. Tags parsed from
+  frontmatter/#hashtags into LanceDB metadata only — no SQLite schema
+  change, `vault_embeddings` stays dormant.
