@@ -727,3 +727,103 @@ all clean. No migrations; harness baseline unchanged (43 tables).
 - Backlog remaining after this iteration: **B7** (agent assessments — next
   per guide, PO spec required), B11 knowledge graph, B12 git backup,
   B13 settings, B14 obsidian sync.
+
+---
+
+## Iteration 12 — Story SO-11: agent assessments, phase 1 (B7 / contexto P3)
+
+**Date:** 2026-07-10
+**Status:** DONE (QA passed; UI walkthrough in `tauri dev` pending a display session)
+
+> As a learner, once SR and practice have taken an item as far as they can,
+> an agent assessment (generated and graded by the local LLM) is the only
+> way to push its mastery into the top band — enforcing "L7+ never via SR
+> alone" on the real schema.
+
+**Process note:** first iteration run under AGENTS.md **Specialized
+Multi-Model Personas** — Fable 5 as Architect-Planner (this spec +
+`.claude_plan.md`), Sonnet 5 sub-agents as Code-Executor (SKILL.md Layer 4
+routing; feature > 50 LOC).
+
+**Scale reconciliation (contexto L1–L10 vs repo mastery 0–100/level 0–5):**
+iteration-1 baseline keeps the repo schema authoritative. Mapping: the
+contexto "L7+" band ≡ **item mastery > 80**. SR reviews and practice
+attempts clamp at 80 (`MASTERY_SR_CAP`); only assessment passes write
+above. Consequence: `v_node_mastery` level 5 (avg 100) is now
+assessment-gated by construction — the §9 guardrail holds arithmetically.
+
+**Acceptance criteria**
+1. Migration `011_assessments.sql`: `assessments` table (kind-carrying for
+   the future two-agent flow), no edits to 001.
+2. Sidecar `assess/` router: `POST /assess/start` (eligibility: mastery ≥
+   cap, no active assessment for the item; generates domain-variant
+   questions via Ollama with catalog-neighbor framings per D9), `POST
+   /assess/submit` (LLM-graded rubric → score; pass ≥ threshold lifts
+   mastery into 80–100 band), `GET /assess/active`, `GET /assess/history`.
+   Ollama down → 503; both steps persist state (row = checkpoint, D24).
+3. SR review path (`sr/router.py`) and Rust `submit_practice_attempt`
+   clamp mastery writes at the cap (mirrored constant — wire-truth pair).
+4. Rust proxies + api.ts wrappers registered; AssessmentCard in the Skills
+   detail view (visible when an item sits at the cap): start → answer →
+   per-question verdicts + score + new mastery.
+5. pytest green offline (fake `_ollama_chat`); cap-clamp regression tests
+   for SR; migration harness passes with the new baseline.
+
+**Decisions**
+- **D21 — L7+ ≡ mastery >80** (see reconciliation above); cap is
+  `MASTERY_SR_CAP = 80` in sidecar config, mirrored as a Rust const in
+  `commands.rs` (documented pair, HFP-2 checked).
+- **D22 — single-agent assessments only in this slice**; two-agent
+  48h-gap certification (contexto L9–L10/T6) deferred to **B7b** —
+  `assessments.kind` ('single' now, 'dual' later) keeps the door open.
+- **D23 — generation & grading on local Ollama** reusing the llm module's
+  `_ollama_chat` + `_parse_json_array`; question prompts pull 3 catalog
+  neighbors via LanceDB retrieval (never the raw catalog file, D9).
+- **D24 — the assessment row is the checkpoint**: questions/answers/status
+  persisted; an interrupted run resumes from `GET /assess/active`.
+- **D25 — pass mapping**: score ≥ `ASSESS_PASS_SCORE` (70) →
+  `mastery = max(current, 80 + round(score/5))` (score 100 → 100);
+  fail records the attempt, mastery unchanged.
+
+### Dev — Commits
+- `f875d4a` feat: agent assessments — the only path above the SR mastery cap
+  (Phase A, Sonnet 5 executor)
+- `6c6bccc` feat: assessment proxies + AssessmentCard in Skills detail
+  (Phase B, Sonnet 5 executor)
+
+### QA — Findings (Fable)
+**Multi-model process verdict:** worked. Sonnet executed both phases from
+`.claude_plan.md` with zero style drift and correctly **halted on a real
+plan/design conflict instead of papering over it**: pre-existing
+`test_mastery_clamped_at_100` (99 + Easy → 100) tests a scenario D21
+deliberately closes. Architect arbitrated — test rewritten as
+`test_mastery_above_cap_never_raised_by_sr` (99 stays 99). Second reported
+mismatch was a stale plan number: harness was already 44 tables after 010
+(iteration-11 note said 43 — corrected), so 011 ⇒ **new baseline 45 tables**.
+Plan file deleted after execution (SKILL.md Layer 4 Phase 3).
+
+**pytest:** 130 passed (9 new: eligibility 409/404, generate/store, resume
+returns same row, 422 count mismatch, pass lifts 80→98, fail leaves cap,
+Ollama-down 503; SR cap regression). Same 15 pre-existing (SO-D1).
+
+**Live (QA DB, llama3.2:3b, Q1/Q2 observed):**
+- start below cap → 409; unknown item → 404; start at cap → 4 questions with
+  domain-variant framings (physics/engineering/ML variants of the calculus
+  item); re-start while active → same assessment id (checkpoint resume ✓).
+- Attempt 1: graded 65 → **failed**, mastery 80 → 80, verdicts persisted.
+- Attempt 2: graded 80 → **passed**, mastery 80 → **96** — exactly D25's
+  `cap + round(score/5)`. History shows both rows; double-submit → 409.
+- `user_item_mastery` and `assessments` rows verified directly in the DB.
+- Model-quality note (not plumbing): the 3B grader is harsh/erratic (scored
+  a correct limit answer 20) and one generated question set contained
+  garbled LaTeX (`∞∛x²`). Larger local models (qwen3.5:9b) should be the
+  recommended assessment model; UI already lets the user pick. → SO-D5.
+
+**Rust/TS:** `cargo check` 0 errors; `tsc` clean on touched files;
+`vite build` OK (47 modules).
+
+**Defects / follow-ups**
+- **SO-D5**: assessment prompt hardening + default model guidance —
+  question-JSON garbling and grading variance on 3B models.
+- **B7b**: two-agent 48h-gap certification (contexto L9–L10/T6) —
+  `assessments.kind='dual'` reserved.
