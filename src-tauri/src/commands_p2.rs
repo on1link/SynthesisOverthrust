@@ -258,6 +258,43 @@ pub async fn llm_explain(
 proxy_get!(llm_list_models, "/llm/models");
 
 // ════════════════════════════════════════════════════════════════════════════
+// ASSESSMENTS (B7) — wire truth: python_sidecar/assess/router.py
+// ════════════════════════════════════════════════════════════════════════════
+
+#[tauri::command]
+pub async fn assess_start(item_id: i64, model: Option<String>) -> Result<Value> {
+    post("/assess/start", json!({"item_id": item_id, "model": model}))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn assess_submit(assessment_id: String, answers: Vec<String>) -> Result<Value> {
+    post(
+        "/assess/submit",
+        json!({"assessment_id": assessment_id, "answers": answers}),
+    )
+    .await
+    .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn assess_active(item_id: Option<i64>) -> Result<Value> {
+    match item_id {
+        Some(id) => get(&format!("/assess/active?item_id={id}")).await,
+        None => get("/assess/active").await,
+    }
+    .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn assess_history(item_id: i64) -> Result<Value> {
+    get(&format!("/assess/history?item_id={item_id}"))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+// ════════════════════════════════════════════════════════════════════════════
 // ANALYTICS
 // ════════════════════════════════════════════════════════════════════════════
 

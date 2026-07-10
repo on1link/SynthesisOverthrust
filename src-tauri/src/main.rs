@@ -287,6 +287,11 @@ fn main() {
             commands_p2::search_related,
             commands_p2::search_reindex,
             commands_p2::search_stats,
+            // ── Phase 2 — Assessments (B7) ───────────────────────────────────
+            commands_p2::assess_start,
+            commands_p2::assess_submit,
+            commands_p2::assess_active,
+            commands_p2::assess_history,
         ])
         .build(tauri::generate_context!())
         .expect("SynthesisOverthrust failed to build");

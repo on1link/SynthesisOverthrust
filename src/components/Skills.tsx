@@ -20,7 +20,7 @@ import type {
   User,
 } from "../api";
 import { api } from "../api";
-import { PracticeCard, ResourcesCard } from "./LearningLoop";
+import { AssessmentCard, PracticeCard, ResourcesCard } from "./LearningLoop";
 import { C, F, BR, SHADOW, card, btn, tag, bar, fill, row, col_, h1, mono } from "../tokens";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -370,6 +370,16 @@ export default function Skills({ skillData, refreshSkills, levelUpSkill }: Skill
           pathId={activeRole}
           col={col}
           subtopics={subtopics}
+          onMasteryChange={() => {
+            api.getSubtopics(sk.id, activeRole).then(setSubtopics).catch(() => {});
+            refreshSkills();
+          }}
+        />
+
+        {/* Agent assessment (B7) — the only path above mastery 80 */}
+        <AssessmentCard
+          subtopics={subtopics}
+          col={col}
           onMasteryChange={() => {
             api.getSubtopics(sk.id, activeRole).then(setSubtopics).catch(() => {});
             refreshSkills();

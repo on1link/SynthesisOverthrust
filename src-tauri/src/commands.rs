@@ -475,6 +475,9 @@ pub async fn update_subtopic_mastery(
 // PRACTICE PROBLEMS + ATTEMPTS
 // ════════════════════════════════════════════════════════════════════════════
 
+// Mirrors python_sidecar settings.MASTERY_SR_CAP (D21) — change both together.
+const MASTERY_SR_CAP: i64 = 80;
+
 #[tauri::command]
 pub async fn list_practice_problems(
     subtopic_id: String,
@@ -538,16 +541,23 @@ pub async fn submit_practice_attempt(
     sqlx::query(
         "INSERT INTO user_item_mastery
          (user_id, item_id, mastery, practice_count, correct_count, last_practiced)
-         VALUES ('default', ?, MAX(0, MIN(100, ?)), 1, ?, datetime('now'))
+         VALUES ('default', ?, MAX(0, MIN(?, ?)), 1, ?, datetime('now'))
          ON CONFLICT(user_id, item_id) DO UPDATE
-            SET mastery        = MAX(0, MIN(100, mastery + ?)),
+            SET mastery        = CASE
+                  WHEN mastery > ? THEN MAX(0, mastery + MIN(0, ?))      -- above cap: deltas can only lower toward it, floor 0
+                  ELSE MAX(0, MIN(?, mastery + ?))
+                END,
                 practice_count = practice_count + 1,
                 correct_count  = correct_count + ?,
                 last_practiced = datetime('now')",
     )
     .bind(item_id)
+    .bind(MASTERY_SR_CAP)
     .bind(delta)
     .bind(if correct { 1i64 } else { 0 })
+    .bind(MASTERY_SR_CAP)
+    .bind(delta)
+    .bind(MASTERY_SR_CAP)
     .bind(delta)
     .bind(if correct { 1i64 } else { 0 })
     .execute(&db.0)

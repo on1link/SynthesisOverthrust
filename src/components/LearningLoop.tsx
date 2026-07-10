@@ -5,7 +5,7 @@
 // ============================================================
 
 import React, { useCallback, useEffect, useState } from "react";
-import type { LearningResource, PracticeProblem, Subtopic } from "../api";
+import type { AssessResult, AssessStart, LearningResource, PracticeProblem, Subtopic } from "../api";
 import { api } from "../api";
 import { C, F, btn, col_, mono, row, card } from "../tokens";
 
@@ -132,6 +132,134 @@ export function PracticeCard({ nodeId, pathId, col, subtopics, onMasteryChange }
           {subId ? "No problems loaded — hit ▶ Drill (seed data covers Calculus › Limits for now)." : "Pick a subtopic to start a drill."}
         </div>
       )}
+    </div>
+  );
+}
+
+// ── B7: Agent assessment (the only path above MASTERY_SR_CAP, D21) ───────────
+
+export function AssessmentCard({ subtopics, col, onMasteryChange }: {
+  subtopics: Subtopic[];
+  col: string;
+  onMasteryChange: () => void;
+}) {
+  const [subId, setSubId] = useState<string>("");
+  const [assessment, setAssessment] = useState<AssessStart | null>(null);
+  const [answers, setAnswers] = useState<string[]>([]);
+  const [result, setResult] = useState<AssessResult | null>(null);
+  const [feedback, setFeedback] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  // Display gating only — mirrors D21's MASTERY_SR_CAP (80). The backend
+  // re-checks against settings.MASTERY_SR_CAP and echoes the live cap in
+  // AssessStart.cap; this literal never needs to be the source of truth.
+  const eligible = subtopics.filter(s => s.mastery >= 80 && s.mastery < 100);
+
+  const begin = useCallback(async () => {
+    if (!subId) return;
+    setLoading(true);
+    setFeedback(null);
+    setResult(null);
+    try {
+      // Resume is transparent: an already-active assessment for this item
+      // comes back from /assess/start unchanged (D24).
+      const res = await api.assessStart(Number(subId));
+      setAssessment(res);
+      setAnswers(new Array(res.questions.length).fill(""));
+    } catch (e) {
+      setFeedback(String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [subId]);
+
+  const updateAnswer = (i: number, v: string) => {
+    setAnswers(prev => prev.map((a, idx) => (idx === i ? v : a)));
+  };
+
+  const submit = useCallback(async () => {
+    if (!assessment) return;
+    setSubmitting(true);
+    setFeedback(null);
+    try {
+      const res = await api.assessSubmit(assessment.assessment_id, answers);
+      setResult(res);
+      onMasteryChange();
+    } catch (e) {
+      setFeedback(String(e));
+    } finally {
+      setSubmitting(false);
+    }
+  }, [assessment, answers, onMasteryChange]);
+
+  const reset = () => {
+    setAssessment(null);
+    setAnswers([]);
+    setResult(null);
+    setFeedback(null);
+  };
+
+  const allAnswered = answers.length > 0 && answers.every(a => a.trim().length > 0);
+
+  return (
+    <div style={{ ...(card(col) as object), padding: "16px 20px" }}>
+      <div style={{ fontFamily: F.display, fontSize: 10, letterSpacing: 3, color: C.muted, paddingBottom: 8, marginBottom: 12, borderBottom: `1px solid ${C.border}`, textTransform: "uppercase" }}>
+        ASSESSMENT — the only path above mastery 80
+      </div>
+
+      {eligible.length === 0 ? (
+        <div style={{ ...mono(11, C.muted) }}>
+          Assessments unlock at mastery 80 — SR and practice stop there; passing an agent assessment pushes into the 80–100 band.
+        </div>
+      ) : !assessment ? (
+        <div style={{ ...row(8), flexWrap: "wrap" }}>
+          <select value={subId} onChange={e => setSubId(e.target.value)}
+            style={{ background: "#00000040", border: `1px solid ${col}55`, borderRadius: 6, color: C.text, fontFamily: F.mono, fontSize: 12, padding: "6px 10px", maxWidth: 320 }}>
+            <option value="">— pick a subtopic —</option>
+            {eligible.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+          </select>
+          <button onClick={begin} disabled={!subId || loading} style={{ ...btn(col), fontSize: 12, padding: "6px 16px" }}>
+            {loading ? "…" : "⚔ Begin Assessment"}
+          </button>
+        </div>
+      ) : !result ? (
+        <div style={col_(12)}>
+          <div style={{ ...mono(10, C.muted) }}>mastery before {assessment.mastery_before} · cap {assessment.cap} · {assessment.questions.length} questions</div>
+          {assessment.questions.map((q, i) => (
+            <div key={i} style={col_(4)}>
+              <div style={{ ...mono(10, C.muted) }}>Q{i + 1} · {q.framing}</div>
+              <div style={{ fontFamily: F.body, fontSize: 13, lineHeight: 1.6, color: C.text }}>{q.question}</div>
+              <textarea value={answers[i] ?? ""} onChange={e => updateAnswer(i, e.target.value)} rows={3}
+                style={{ background: "#00000040", border: `1px solid ${col}55`, borderRadius: 6, color: C.text, fontFamily: F.body, fontSize: 12, padding: "8px 10px", resize: "vertical" }} />
+            </div>
+          ))}
+          <div style={row(8)}>
+            <button onClick={submit} disabled={!allAnswered || submitting} style={{ ...btn(col), fontSize: 12, padding: "8px 18px" }}>
+              {submitting ? "…" : "Submit"}
+            </button>
+            <button onClick={reset} style={{ ...btn(C.muted, true), fontSize: 11 }}>Cancel</button>
+          </div>
+        </div>
+      ) : (
+        <div style={col_(10)}>
+          {result.status === "failed" && (
+            <div style={{ ...mono(11, C.red) }}>Not yet — review and retry.</div>
+          )}
+          <div style={{ fontFamily: F.mono, fontSize: 13, fontWeight: 700, color: result.status === "passed" ? C.green : C.red }}>
+            {result.status === "passed" ? "✓ Passed" : "✗ Failed"} · score {result.score} · mastery {result.mastery_before} → {result.mastery_after}
+          </div>
+          {result.verdicts.map((v, i) => (
+            <div key={i} style={{ borderLeft: `2px solid ${col}55`, paddingLeft: 10 }}>
+              <div style={{ ...mono(10, C.muted) }}>Q{i + 1} · score {v.score}</div>
+              <div style={{ fontFamily: F.body, fontSize: 12, color: C.text2, lineHeight: 1.6 }}>{v.feedback}</div>
+            </div>
+          ))}
+          <button onClick={reset} style={{ ...btn(col, true), fontSize: 11, alignSelf: "flex-start" }}>↺ New attempt</button>
+        </div>
+      )}
+
+      {feedback && <div style={{ ...mono(11, C.gold), marginTop: 10 }}>{feedback}</div>}
     </div>
   );
 }

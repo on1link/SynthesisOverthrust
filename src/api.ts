@@ -138,6 +138,12 @@ export const api = {
   searchReindex: () => invoke<SearchStats>("search_reindex"),
   searchStats: () => invoke<SearchStats>("search_stats"),
 
+  // ── Assessments (B7) — wire truth: python_sidecar/assess/router.py ────────
+  assessStart: (itemId: number, model?: string) => invoke<AssessStart>("assess_start", { itemId, model }),
+  assessSubmit: (assessmentId: string, answers: string[]) => invoke<AssessResult>("assess_submit", { assessmentId, answers }),
+  assessActive: (itemId?: number) => invoke<AssessStart[]>("assess_active", { itemId }),
+  assessHistory: (itemId: number) => invoke<AssessHistoryRow[]>("assess_history", { itemId }),
+
   // ── AI Tutor (Ollama, B8) — wire truth: python_sidecar/llm/router.py ──────
   llmChat: (messages: ChatMsg[], opts?: { model?: string; contextType?: "general" | "skill" | "vault"; skillId?: string; sessionId?: string }) =>
     invoke<LlmChatResponse>("llm_chat", { messages, model: opts?.model, contextType: opts?.contextType, skillId: opts?.skillId, sessionId: opts?.sessionId }),
@@ -514,6 +520,13 @@ export interface ScoutFewshot { title: string; summary: string; proposed: { skil
 // ── Search / LLM / Analytics ──────────────────────────────────────────────────
 export interface SearchResult { path: string; title: string; tags: string[]; chunk_index: number; chunk_text: string; score: number; }
 export interface SearchStats { indexed?: boolean; indexed_chunks: number; unique_notes: number; }
+
+// ── Assessments (B7) — wire truth: python_sidecar/assess/router.py ────────────
+export interface AssessQuestion { question: string; framing: string; }
+export interface AssessStart { assessment_id: string; item_id: number; questions: AssessQuestion[]; mastery_before: number; cap: number; }
+export interface AssessVerdict { score: number; feedback: string; }
+export interface AssessResult { status: "passed" | "failed"; score: number; verdicts: AssessVerdict[]; mastery_before: number; mastery_after: number; node_id?: string; node_level?: number; }
+export interface AssessHistoryRow { id: string; status: string; score?: number; created_at: string; completed_at?: string; }
 export interface ChatMsg { role: "user" | "assistant" | "system"; content: string; }
 export interface LlmChatResponse { reply: string; session_id: string; model: string; }
 export interface LlmPracticeResult { problems: PracticeProblem[]; count: number; model: string; }
