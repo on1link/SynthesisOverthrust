@@ -9,17 +9,21 @@
 # ============================================================
 
 from __future__ import annotations
+import json
+import re
 import uuid
-from typing import List, Optional, AsyncGenerator
+from typing import List, Literal, Optional, AsyncGenerator
 
 import httpx
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from config import settings
 from db import get_db
-from search.indexer import semantic_search
+
+# NOTE: vault RAG (search.indexer) deliberately NOT imported — it pulls the
+# optional faiss dep and would kill sidecar boot. Lands with B10 (D11).
 
 router = APIRouter()
 
@@ -42,13 +46,11 @@ class ChatIn(BaseModel):
 
 
 class PracticeIn(BaseModel):
-    skill_id:   str
-    path_id:    str
-    skill_name: str
-    level:      int = 1         # 1-10 current skill level
-    difficulty: str = "Medium"  # Easy | Medium | Hard
-    count:      int = 3
-    model:      Optional[str] = None
+    subtopic_id: str            # topic_items.id (TEXT in practice_problems)
+    path_id:     str            # drill-bank scope key (list_practice_problems filter)
+    difficulty:  Literal["easy", "medium", "hard"] = "medium"
+    count:       int = Field(default=3, ge=1, le=10)
+    model:       Optional[str] = None
 
 
 class ExplainIn(BaseModel):
@@ -127,20 +129,11 @@ async def chat(body: ChatIn):
     session_id = body.session_id or str(uuid.uuid4())
     db         = await get_db()
 
+    if body.context_type == "vault":
+        raise HTTPException(501, "Vault context lands with the vault search slice (B10).")
+
     # ── Build system prompt ───────────────────────────────────────────────
     system = _system_prompt(body.context_type, body.skill_id)
-
-    # ── Vault RAG context injection ───────────────────────────────────────
-    vault_context = ""
-    if body.context_type == "vault" and body.messages:
-        last_query = body.messages[-1].content
-        results    = await semantic_search(last_query, top_k=4)
-        if results:
-            vault_context = "\n\n## Relevant vault notes:\n" + "\n---\n".join(
-                f"**{r['title']}** (score:{r['score']:.2f})\n{r['chunk_text']}"
-                for r in results
-            )
-            system += vault_context
 
     # ── Load conversation history from DB ─────────────────────────────────
     async with db.execute(
@@ -187,27 +180,46 @@ async def chat(body: ChatIn):
 # ── /practice ─────────────────────────────────────────────────────────────────
 @router.post("/practice")
 async def generate_practice(body: PracticeIn):
-    """Generate N practice problems for a skill node at its current level."""
+    """
+    Generate N practice problems for a subtopic and store them in the
+    shared drill bank (`practice_problems`, migration 009) so the existing
+    practice flow (`list_practice_problems`) can serve them (D13).
+    """
     model = _resolve_model(body.model)
+    db    = await get_db()
+
+    # Subtopic context for the prompt — item → topic → skill
+    async with db.execute(
+        """SELECT ti.content AS subtopic, t.header AS topic, s.name AS skill
+           FROM topic_items ti
+           JOIN topics t ON ti.topic_id = t.id
+           JOIN skills s ON t.skill_id  = s.id
+           WHERE ti.id = ?""",
+        (body.subtopic_id,)
+    ) as cur:
+        ctx = await cur.fetchone()
+    if ctx is None:
+        raise HTTPException(404, f"Unknown subtopic_id {body.subtopic_id}")
+
     diff_desc = {
-        "Easy":   "conceptual or recall-based",
-        "Medium": "application or implementation",
-        "Hard":   "synthesis, edge-case, or system design",
-    }.get(body.difficulty, "application")
+        "easy":   "conceptual or recall-based",
+        "medium": "application or implementation",
+        "hard":   "synthesis, edge-case, or system design",
+    }[body.difficulty]
 
     prompt = f"""You are an expert ML engineering tutor.
-Generate exactly {body.count} practice problems for the skill: **{body.skill_name}**
-- Skill level: {body.level}/10
+Generate exactly {body.count} practice problems for this subtopic:
+- Skill: {ctx['skill']}
+- Topic: {ctx['topic']}
+- Subtopic: {ctx['subtopic']}
 - Difficulty: {body.difficulty} ({diff_desc})
-- Path: {body.path_id.upper()}
 
 Return ONLY a JSON array (no markdown, no preamble) with this structure:
 [
   {{
-    "question": "...",
-    "answer": "...",
-    "hint": "...",
-    "difficulty": "{body.difficulty}"
+    "problem_text": "...",
+    "hints": ["hint 1", "hint 2"],
+    "explanation": "full solution / why"
   }}
 ]
 """
@@ -220,31 +232,51 @@ Return ONLY a JSON array (no markdown, no preamble) with this structure:
     try:
         raw = await _ollama_chat(messages, model)
     except httpx.HTTPError as e:
-        raise HTTPException(503, f"Ollama unavailable: {e}")
+        raise HTTPException(503, f"Ollama unavailable: {e}. Ensure `ollama serve` is running.")
 
-    # Parse and persist
-    import json, re
-    # Strip any accidental markdown fences
-    clean = re.sub(r"```json?|```", "", raw).strip()
-    try:
-        problems = json.loads(clean)
-    except json.JSONDecodeError:
-        # Fallback: extract JSON array from response
-        match = re.search(r"\[.*\]", clean, re.DOTALL)
-        problems = json.loads(match.group()) if match else []
+    problems = _parse_json_array(raw)
+    if not problems:
+        raise HTTPException(502, "Ollama returned no parseable problems — try again or switch model.")
 
-    db = await get_db()
+    stored = []
     for p in problems:
+        text = str(p.get("problem_text", "")).strip()
+        if not text:
+            continue
+        row = {
+            "id":           str(uuid.uuid4()),
+            "difficulty":   body.difficulty,
+            "problem_text": text,
+            "hints":        json.dumps([str(h) for h in p.get("hints", [])]),
+            "explanation":  str(p.get("explanation", "")) or None,
+        }
         await db.execute(
             """INSERT INTO practice_problems
-               (id,user_id,skill_id,path_id,question,answer,difficulty,model)
-               VALUES (?,?,?,?,?,?,?,?)""",
-            (str(uuid.uuid4()), "default", body.skill_id, body.path_id,
-             p.get("question",""), p.get("answer",""), body.difficulty, model)
+               (id, subtopic_id, path_id, difficulty, problem_text, hints, explanation)
+               VALUES (?,?,?,?,?,?,?)""",
+            (row["id"], body.subtopic_id, body.path_id, row["difficulty"],
+             row["problem_text"], row["hints"], row["explanation"])
         )
+        stored.append(row)
     await db.commit()
 
-    return {"problems": problems, "count": len(problems), "model": model}
+    return {"problems": stored, "count": len(stored), "model": model}
+
+
+def _parse_json_array(raw: str) -> list[dict]:
+    """Parse an LLM response into a JSON array, tolerating markdown fences."""
+    clean = re.sub(r"```json?|```", "", raw).strip()
+    try:
+        parsed = json.loads(clean)
+    except json.JSONDecodeError:
+        match  = re.search(r"\[.*\]", clean, re.DOTALL)
+        if not match:
+            return []
+        try:
+            parsed = json.loads(match.group())
+        except json.JSONDecodeError:
+            return []
+    return parsed if isinstance(parsed, list) else []
 
 
 # ── /explain ──────────────────────────────────────────────────────────────────
@@ -321,7 +353,6 @@ Respond with valid JSON only. No preamble."""
     except httpx.HTTPError as e:
         raise HTTPException(503, f"Ollama unavailable: {e}")
 
-    import json, re
     clean = re.sub(r"```json?|```", "", raw).strip()
     try:
         parsed = json.loads(clean)
