@@ -671,7 +671,7 @@ build` clean on touched files. Services stopped after QA (Q2).
 ## Iteration 11 — Story SO-10: vault semantic search (B10)
 
 **Date:** 2026-07-10
-**Status:** IN PROGRESS
+**Status:** DONE (QA passed; UI walkthrough in `tauri dev` pending a display session)
 
 > As a learner, I search my Obsidian vault semantically from the Vault view,
 > and the AI tutor answers with my own notes as context (unlocks D11).
@@ -690,3 +690,40 @@ build` clean on touched files. Services stopped after QA (Q2).
   2.5k rows embed in ~11 s, vaults are smaller. Tags parsed from
   frontmatter/#hashtags into LanceDB metadata only — no SQLite schema
   change, `vault_embeddings` stays dormant.
+
+### Dev — Commits
+- `a739428` feat: vault semantic search on LanceDB + tutor vault RAG (B10, SO-10)
+- `4cbc8fd` feat: register vault search Tauri proxies (B10)
+- `fc6fc74` feat: semantic vault search UI + tutor Vault context (B10)
+
+### QA — Findings
+**pytest:** 121 passed (11 new: store reindex/metadata/chunk-overlap/
+409-paths, router query/related/stats/vault-path-409; llm vault tests
+flipped from 501 to inject-notes + 409-unindexed). Same 15 pre-existing
+(SO-D1). Test gotcha logged: monkeypatching `catalog.store.default_embedder`
+does NOT reach `search.store`'s from-import binding — patch the name where
+it's bound, or the real MiniLM loads mid-test.
+
+**Live (QA DB + scratch vault of 3 notes, Q1/Q2 observed):**
+- query before index → 409; reindex → `{indexed_chunks 3, unique_notes 3}`
+  (empty notes skipped); stats agree.
+- Relevance: "how does multi-head attention work" → Transformer Attention
+  0.66 ≫ others; "when should flashcard reviews be scheduled" → FSRS note
+  top; sourdough decoy always last. Frontmatter + inline tags merged.
+- **D11 payoff:** `/llm/chat context_type=vault` (llama3.2:3b) answered
+  "…at the moment predicted retention drops to 90 percent" — verbatim from
+  the note. 501 gone.
+- `/search/related/skill_genai_llm` returns ranked notes (small-vault scores
+  are honest ~0.25 — nothing pretends relevance).
+
+**Rust/TS:** `cargo check`, `tsc --noEmit` (touched files), `vite build`
+all clean. No migrations; harness baseline unchanged (43 tables).
+
+**Notes / debt**
+- `sync/watcher.py` still references the deleted FAISS indexer — module is
+  unmounted; rewrite lands with B14 (vault sync) against `search/store`.
+- `SpacedRepetition`-era `vault_embeddings` table (002) now dormant — drop
+  or repurpose in a future migration when B14 defines the sync store.
+- Backlog remaining after this iteration: **B7** (agent assessments — next
+  per guide, PO spec required), B11 knowledge graph, B12 git backup,
+  B13 settings, B14 obsidian sync.
