@@ -4,60 +4,99 @@
 # ============================================================
 
 from __future__ import annotations
-from fastapi import APIRouter
-from pydantic import BaseModel
+from dataclasses import asdict
+from pathlib import Path
 from typing import Optional
 import asyncio
 
-from .git import git_commit, git_push, git_log, git_status, snapshot_db, syncthing_status, syncthing_folders
+from fastapi import APIRouter, HTTPException
+from pydantic import BaseModel
+
+from .git import (
+    git_commit, git_push, git_log, git_status, git_set_remote,
+    snapshot_db, list_snapshots, syncthing_status, syncthing_folders,
+)
 from config import settings
 from db import get_db
 
 router = APIRouter()
 
 
+def _data_dir() -> str:
+    return settings.BACKUP_DIR
+
+
 class CommitIn(BaseModel):
     message: Optional[str] = None
 
 
+class SetRemoteIn(BaseModel):
+    url: str
+
+
+async def _log_snapshot(db, name: str) -> None:
+    await db.execute(
+        "INSERT INTO backup_log (backup_type, target, commit_hash, files_changed, status) VALUES (?,?,?,?,?)",
+        ("snapshot", name, None, 0, "ok")
+    )
+
+
 @router.get("/status")
 async def backup_status():
-    data_dir = settings.BACKUP_DIR if hasattr(settings, "BACKUP_DIR") else str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
-    return git_status(data_dir)
+    return git_status(_data_dir())
 
 
 @router.post("/commit")
 async def backup_commit(body: CommitIn):
-    data_dir = str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
-    result   = await asyncio.to_thread(git_commit, data_dir, body.message)
     db = await get_db()
+
+    snapshot_path = await snapshot_db(settings.DB_PATH, _data_dir())
+    snapshot_name = Path(snapshot_path).name
+    await _log_snapshot(db, snapshot_name)
+    await db.commit()
+
+    result = await asyncio.to_thread(git_commit, _data_dir(), body.message)
     await db.execute(
         "INSERT INTO backup_log (backup_type, target, commit_hash, files_changed, status) VALUES (?,?,?,?,?)",
         ("git", "vault+db", result.commit_hash, result.files_changed, result.status)
     )
     await db.commit()
-    return result
+
+    return {**asdict(result), "snapshot": snapshot_name}
 
 
 @router.post("/push")
 async def backup_push():
-    data_dir = str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
-    msg      = await asyncio.to_thread(git_push, data_dir)
+    msg = await asyncio.to_thread(git_push, _data_dir())
     return {"result": msg}
+
+
+@router.post("/set-remote")
+async def backup_set_remote(body: SetRemoteIn):
+    if not body.url:
+        raise HTTPException(422, "url must not be empty")
+    result = await asyncio.to_thread(git_set_remote, _data_dir(), body.url)
+    return {"result": result}
 
 
 @router.get("/log")
 async def backup_log_endpoint(limit: int = 20):
-    data_dir = str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
-    return git_log(data_dir, limit)
+    return git_log(_data_dir(), limit)
 
 
 @router.post("/snapshot-db")
 async def snapshot_database():
-    from config import settings
-    data_dir = str(__import__("pathlib").Path.home() / ".local/share/synthesis-overthrust")
-    path     = await snapshot_db(settings.DB_PATH, data_dir)
-    return {"snapshot": path}
+    db = await get_db()
+    snapshot_path = await snapshot_db(settings.DB_PATH, _data_dir())
+    snapshot_name = Path(snapshot_path).name
+    await _log_snapshot(db, snapshot_name)
+    await db.commit()
+    return {"snapshot": snapshot_path}
+
+
+@router.get("/snapshots")
+async def backup_snapshots():
+    return list_snapshots(_data_dir())
 
 
 @router.get("/syncthing/status")

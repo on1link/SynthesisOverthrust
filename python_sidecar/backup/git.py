@@ -6,7 +6,7 @@
 
 from __future__ import annotations
 import asyncio
-import shutil
+import hashlib
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -15,6 +15,20 @@ from typing import Optional
 import structlog
 
 log = structlog.get_logger()
+
+# D29 — repo-root .gitignore. The DB (+ WAL/SHM sidecars) and LanceDB
+# vector store are backed up via snapshot_db()/Syncthing respectively,
+# never via git.
+GITIGNORE_CONTENT = (
+    "/synthesis_overthrust.db\n"
+    "/synthesis_overthrust.db-wal\n"
+    "/synthesis_overthrust.db-shm\n"
+    "/lancedb/\n"
+    "*.index\n"
+    "*.faiss\n"
+    "__pycache__/\n"
+    ".venv/\n"
+)
 
 
 @dataclass
@@ -25,24 +39,47 @@ class CommitResult:
     files_changed: int = 0
 
 
+def _ensure_identity(repo) -> None:
+    """Ensure the repo has a resolvable committer identity so local commits
+    succeed even on fresh machines / CI runners with no global git config.
+    Never clobbers an identity already set at any config level."""
+    cr = repo.config_reader()
+    has_name  = cr.has_section("user") and cr.has_option("user", "name")
+    has_email = cr.has_section("user") and cr.has_option("user", "email")
+    if has_name and has_email:
+        return
+    with repo.config_writer() as cw:
+        if not has_name:
+            cw.set_value("user", "name", "SynthesisOverthrust")
+        if not has_email:
+            cw.set_value("user", "email", "backup@synthesisoverthrust.local")
+
+
 def _get_repo(data_dir: Path):
     """Get or init a git repo at data_dir."""
     import git
     repo_path = data_dir
-    if not (repo_path / ".git").exists():
-        repo = git.Repo.init(str(repo_path))
-        # Create .gitignore
-        (repo_path / ".gitignore").write_text(
-            "*.index\n*.faiss\n__pycache__/\n.venv/\n"
-        )
+    is_new = not (repo_path / ".git").exists()
+    if is_new:
+        git.Repo.init(str(repo_path))
         log.info("Git repo initialised", path=str(repo_path))
-    return git.Repo(str(repo_path))
+
+    repo = git.Repo(str(repo_path))
+
+    gitignore_path = repo_path / ".gitignore"
+    if is_new or not gitignore_path.exists():
+        gitignore_path.write_text(GITIGNORE_CONTENT)
+    elif "/lancedb/" not in gitignore_path.read_text():
+        # One-time upgrade of a pre-D29 .gitignore.
+        gitignore_path.write_text(GITIGNORE_CONTENT)
+
+    _ensure_identity(repo)
+    return repo
 
 
 def git_commit(data_dir: str, message: Optional[str] = None) -> CommitResult:
     """Stage all changes and create a commit."""
     try:
-        import git
         path = Path(data_dir)
         repo = _get_repo(path)
 
@@ -68,21 +105,34 @@ def git_commit(data_dir: str, message: Optional[str] = None) -> CommitResult:
 def git_push(data_dir: str) -> str:
     """Push to remote if configured."""
     try:
-        import git
         repo = _get_repo(Path(data_dir))
         if not repo.remotes:
             return "No remote configured. Add one: git -C <path> remote add origin <url>"
         origin = repo.remotes.origin
-        origin.push()
+        # Explicit refspec — a fresh local branch has no upstream tracking
+        # ref yet, and git's "simple" push default refuses to push without one.
+        branch = repo.active_branch.name
+        origin.push(refspec=f"{branch}:{branch}")
         return "pushed"
     except Exception as e:
         return f"push failed: {e}"
 
 
+def git_set_remote(data_dir: str, url: str) -> str:
+    """Create-or-update the 'origin' remote."""
+    repo = _get_repo(Path(data_dir))
+    names = [r.name for r in repo.remotes]
+    if "origin" in names:
+        repo.remotes.origin.set_url(url)
+    else:
+        repo.create_remote("origin", url)
+    log.info("Git remote set", url=url)
+    return "ok"
+
+
 def git_log(data_dir: str, limit: int = 20) -> list[dict]:
     """Return recent commit history."""
     try:
-        import git
         repo    = _get_repo(Path(data_dir))
         commits = []
         for commit in list(repo.iter_commits())[:limit]:
@@ -100,7 +150,6 @@ def git_log(data_dir: str, limit: int = 20) -> list[dict]:
 def git_status(data_dir: str) -> dict:
     """Return working tree status."""
     try:
-        import git
         repo = _get_repo(Path(data_dir))
         return {
             "dirty":       repo.is_dirty(),
@@ -113,19 +162,47 @@ def git_status(data_dir: str) -> dict:
         return {"error": str(e)}
 
 
+def _consistent_copy(src: str, dst: str) -> None:
+    """SQLite online-backup API — safe to run against a live WAL-mode DB
+    without pausing writers, unlike a raw file copy."""
+    import sqlite3
+    with sqlite3.connect(src) as source, sqlite3.connect(dst) as target:
+        source.backup(target)
+
+
 async def snapshot_db(db_path: str, backup_dir: str) -> str:
-    """Copy SQLite DB to backup directory with timestamp."""
+    """Consistent-copy the SQLite DB into backup_dir/snapshots with a
+    timestamped name; prune to the last 10."""
     src  = Path(db_path)
     dst  = Path(backup_dir) / "snapshots"
     dst.mkdir(parents=True, exist_ok=True)
-    name = f"synthesis_overthrust_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.db"
-    await asyncio.to_thread(shutil.copy2, str(src), str(dst / name))
+    name = f"synthesis_overthrust_{datetime.utcnow().strftime('%Y%m%d_%H%M%S_%f')}.db"
+    target = dst / name
+    await asyncio.to_thread(_consistent_copy, str(src), str(target))
     log.info("DB snapshot created", file=name)
     # Keep only last 10 snapshots
     snapshots = sorted(dst.glob("synthesis_overthrust_*.db"))
     for old in snapshots[:-10]:
         old.unlink(missing_ok=True)
-    return str(dst / name)
+    return str(target)
+
+
+def list_snapshots(backup_dir: str) -> list[dict]:
+    """List DB snapshots, newest first."""
+    dst = Path(backup_dir) / "snapshots"
+    if not dst.exists():
+        return []
+    files = sorted(dst.glob("synthesis_overthrust_*.db"), reverse=True)
+    out = []
+    for f in files:
+        stat = f.stat()
+        out.append({
+            "name":    f.name,
+            "size":    stat.st_size,
+            "sha256":  hashlib.sha256(f.read_bytes()).hexdigest(),
+            "created": datetime.fromtimestamp(stat.st_mtime).isoformat(),
+        })
+    return out
 
 
 async def ensure_git_repo(data_dir: str) -> None:

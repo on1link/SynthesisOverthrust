@@ -35,7 +35,7 @@ from assess.router   import router as assess_router
 from graph.router    import router as graph_router
 # from collab.router   import router as collab_router
 from plugins.router  import router as plugins_router
-# from backup.router   import router as backup_router
+from backup.router   import router as backup_router
 # from mobile.router   import router as mobile_router
 from config          import settings
 from db              import init_db
@@ -72,11 +72,11 @@ async def lifespan(app: FastAPI):
     #     log.warning("Graph build skipped", error=str(e))
 
     # Git backup repo init
-    # try:
-    #     from backup.git import ensure_git_repo
-    #     asyncio.create_task(ensure_git_repo(settings.DATA_DIR))
-    # except Exception as e:
-    #     log.warning("Git init skipped", error=str(e))
+    try:
+        from backup.git import ensure_git_repo
+        asyncio.create_task(ensure_git_repo(settings.BACKUP_DIR))
+    except Exception as e:
+        log.warning("Git init skipped", error=str(e))
 
     # Plugin loader
     try:
@@ -128,7 +128,7 @@ app.include_router(assess_router,    prefix="/assess",    tags=["Assessments"])
 app.include_router(graph_router,     prefix="/graph",     tags=["Knowledge Graph"])
 # app.include_router(collab_router,    prefix="/collab",    tags=["Study Rooms"])
 app.include_router(plugins_router,   prefix="/plugins",   tags=["Plugins"])
-# app.include_router(backup_router,    prefix="/backup",    tags=["Backup"])
+app.include_router(backup_router,    prefix="/backup",    tags=["Backup"])
 # app.include_router(mobile_router,    prefix="/mobile",    tags=["Mobile API"])
 
 
