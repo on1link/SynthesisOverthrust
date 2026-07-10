@@ -501,4 +501,107 @@ insight ✓; weekly snapshot → saved ✓. `cargo check` + `tsc` + `vite build`
 clean; pytest baseline unchanged (91/15). Services restarted per Q2.
 
 ### Dev — Commits
-- (this commit) feat: analytics dashboard on FSRS-era schema (B9)
+- `325068a` feat: analytics dashboard on FSRS-era schema (B9)
+
+---
+
+## Iteration 9 — Story SO-8: AI Tutor on Ollama (B8)
+
+**Date:** 2026-07-10
+**Status:** DONE (QA passed; UI walkthrough in `tauri dev` pending a display session)
+
+**PO note — B7 deliberately jumped:** B7 (agent assessments) is large, needs its
+own spec, and wants LLM infrastructure; B8 lands that infrastructure (Ollama
+plumbing) which B7 and D8 (Scout LLM re-ranking) both consume. Ollama verified
+installed locally (llama3, qwen3.5:9b, gemma4:e4b, …).
+
+### Story SO-8
+
+> As a learner, I chat with a local Ollama tutor (general or skill-scoped),
+> ask for concept explanations, and generate practice problems that land in
+> the drillable practice bank — all local, via the sidecar.
+
+**Drift found (§6.6, all four proxies + router):**
+- `llm/router.py` `/practice` inserts a phantom `practice_problems` schema
+  (`user_id,skill_id,question,answer,model`) — 009's real table is
+  `subtopic_id,path_id,difficulty(lowercase CHECK),problem_text,hints,explanation`.
+- Top-level `from search.indexer import semantic_search` imports `faiss`
+  (optional `cpu` extra) — mounting the router would kill sidecar boot.
+- Rust `llm_chat` sends `vault_context` (not in ChatIn); `llm_practice` sends
+  2 of 4 required fields; `llm_explain` sends `context` (not in ExplainIn);
+  `llm_ingest_paper` posts `file_path` to an endpoint expecting `text`.
+- `AITutor.tsx` runs on a hardcoded 5-skill mock array.
+- `llm_conversations` (002) matches the chat insert — no migration needed.
+
+**Acceptance criteria**
+1. llm router mounted; sidecar boots clean **without faiss** (lazy import).
+2. `/llm/chat` persists turns to `llm_conversations`, injects last-20 history
+   by `session_id`, returns `{reply, session_id, model}`; Ollama down → 503 hint.
+3. `/llm/practice` rewritten to 009 wire truth: `{subtopic_id, path_id,
+   difficulty, count, model?}`, names for the prompt derived from
+   topic_items→topics→skills join, inserts land in the B4 drill bank.
+4. `/llm/explain` `{concept, target_level, analogy_domain?}`; `/llm/models`
+   lists local tags, graceful error hint when Ollama down.
+5. Rust proxies match pydantic wire (HFP-2 check), registered in main.rs.
+6. api.ts wrappers enabled (camelCase invoke keys); AITutor routed under
+   Intelligence: Chat/Practice/Explain tabs on real API, skill picker from
+   real DB skills, Papers tab renders deferred state.
+7. pytest green with fake Ollama (monkeypatched, no network, no downloads).
+
+**Decisions**
+- **D11 — vault RAG deferred to B10**: `context_type="vault"` → 501; faiss
+  import made lazy. B10 lands the real vault index.
+- **D12 — paper-digest/PDF ingestion deferred** to the vault slice (B10/B14):
+  multipart upload + PyPDF2 + vault-write belong together. `llm_ingest_paper`
+  stays unregistered.
+- **D13 — LLM-generated problems write to 009 `practice_problems`** — one
+  drill bank (B4 + B8 share it); difficulty normalized to lowercase CHECK.
+- **D14 — no streaming through Tauri invoke** (request/response only);
+  event-channel streaming is a follow-up if chat latency demands it.
+
+### Dev — Commits
+- `8a59905` docs: sidecar lifecycle script + HFP skills + monitor sub-agent
+  blueprint (prior-session process hardening, committed at iteration start)
+- `df0d817` feat: mount llm router — Ollama tutor endpoints on real schema (B8)
+- `350e43e` feat: register llm Tauri proxies matching pydantic wire (B8)
+- `96553b2` feat: AI Tutor view on real skills and drill bank (B8)
+- `9ab8da1` fix: repair unescaped LaTeX backslashes in LLM practice JSON
+
+### QA — Findings
+**pytest:** 106 passed (15 new llm tests: chat persistence + server-side
+history, skill-context prompt, vault 501, Ollama-down 503 with no partial
+persist, practice→drill-bank writes, LaTeX/fence/dict-wrapper parse repair,
+404/422/502). Same 15 pre-existing failures (SO-D1).
+
+**Live sidecar (QA DB via `scripts/sidecar.sh`, Q1 verified `path=` in log
+before any call):**
+- `/llm/models` → all 9 local Ollama tags.
+- `/llm/chat` (llama3.2:3b) → coherent reply; second turn with same
+  `session_id` repeated first answer verbatim → server-side history proven;
+  4 rows in `llm_conversations`.
+- `context_type=vault` → 501; bad difficulty/count → 422; unknown subtopic
+  → 404.
+- **Defect found & fixed live:** `/llm/practice` → 502 — model emits raw
+  LaTeX inside JSON strings (`x \geq 0` = invalid escape; `\frac` silently
+  becomes a form feed; piecewise `\\` pairs re-doubled by a naive repair).
+  Fix: strict parse → repair pass treating every backslash as literal except
+  `\\`/`\"` consumed as pairs (`9ab8da1`). Post-fix: 8/9 live generations
+  parse; residual failures (suspected token truncation) return the designed
+  502 "try again". After fix: 2 problems generated → landed in
+  `practice_problems` and match the exact `list_practice_problems` WHERE
+  shape (subtopic+path+difficulty) → drillable from Skills → Practice.
+- `/llm/explain` (beginner, cooking analogy) → on-target structured answer.
+
+**Rust/TS:** `cargo check` clean; `tsc --noEmit` clean on touched files;
+`vite build` OK. QA sidecar stopped after run (Q2, port left free).
+
+**Notes**
+- AITutor mock `SKILLS` array gone — skill/subtopic pickers run on
+  `get_skill_levels`/`get_subtopics`; chat sends only the new turn (history
+  is server-side per session), which also stops double-persisting old turns.
+- Tutor-generated problems feed the same mastery/XP path as B4 drills via
+  `submit_practice_attempt` — one drill bank, two entry points.
+- `002_phase2.sql` header comment claims 001 defines `practice_problems` —
+  stale (009 does); comment-only, no action.
+- Ollama default model in sidecar config is `llama3` (installed ✓); UI model
+  picker lists all local tags.
