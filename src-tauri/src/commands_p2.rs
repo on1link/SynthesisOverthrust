@@ -97,6 +97,13 @@ pub async fn catalog_search(
 
 proxy_get!(catalog_stats, "/catalog/stats");
 
+#[tauri::command]
+pub async fn catalog_sync_tree() -> Result<Value> {
+    post("/catalog/sync-tree", json!({}))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
 // ════════════════════════════════════════════════════════════════════════════
 // SKILL SCOUT (discovery agent + correction loop)
 // ════════════════════════════════════════════════════════════════════════════

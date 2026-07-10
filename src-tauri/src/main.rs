@@ -266,6 +266,7 @@ fn main() {
             commands_p2::catalog_ingest,
             commands_p2::catalog_search,
             commands_p2::catalog_stats,
+            commands_p2::catalog_sync_tree,
             // ── Phase 2 — Analytics ─────────────────────────────────────────
             commands_p2::analytics_overview,
             commands_p2::analytics_skill_velocity,

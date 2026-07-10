@@ -64,6 +64,22 @@ interface SkillsProps {
 export default function Skills({ skillData, refreshSkills, levelUpSkill }: SkillsProps) {
   const [activeRole, setActiveRole] = useState<string>("");
   const [freeMode, setFreeMode] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMsg, setSyncMsg] = useState<string | null>(null);
+
+  const syncTree = useCallback(async () => {
+    setSyncing(true);
+    setSyncMsg(null);
+    try {
+      const r = await api.catalogSyncTree();
+      setSyncMsg(`+${r.roles_created} roles · +${r.links_created} links · ${r.tiers_set} tiers set · ${r.matched} skills matched${r.unmatched.length ? ` · unmatched: ${r.unmatched.join(", ")}` : ""}`);
+      await refreshSkills();
+    } catch (e) {
+      setSyncMsg(`⚠ ${String(e)}`);
+    } finally {
+      setSyncing(false);
+    }
+  }, [refreshSkills]);
   const [detailId, setDetailId] = useState<string | null>(null);
   const [subtopics, setSubtopics] = useState<Subtopic[]>([]);
   const [activeTierId, setActiveTierId] = useState<string>("");
@@ -446,19 +462,36 @@ export default function Skills({ skillData, refreshSkills, levelUpSkill }: Skill
               <div style={{ fontFamily: F.mono, color: col, fontSize: 9, letterSpacing: 4, marginBottom: 2 }}>// NEURALFORGE</div>
               <h2 style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.text, margin: 0, letterSpacing: 1 }}>Path Progression</h2>
             </div>
-            {/* Mode toggle */}
-            <button onClick={() => setFreeMode(v => !v)}
-              style={{
-                ...row(6), padding: "5px 14px", borderRadius: BR.pill, cursor: "pointer",
-                background: freeMode ? `${C.gold}22` : `${C.muted}15`,
-                border: `1px solid ${freeMode ? C.gold + "55" : C.border}`,
-                color: freeMode ? C.gold : C.muted, fontFamily: F.mono, fontSize: 10, fontWeight: 700,
-                letterSpacing: 1, transition: "all 0.2s",
-              }}
-            >
-              {freeMode ? "🔓" : "🔒"} {freeMode ? "FREE SANDBOX" : "STRICT PATH"}
-            </button>
+            <div style={row(8)}>
+              {/* Catalog → tree sync (roles, skill links, tiers) */}
+              <button onClick={syncTree} disabled={syncing}
+                title="Mirror catalog roles, skill links and tiers into the tree"
+                style={{
+                  ...row(6), padding: "5px 14px", borderRadius: BR.pill, cursor: "pointer",
+                  background: `${C.teal}15`, border: `1px solid ${C.teal}44`,
+                  color: C.teal, fontFamily: F.mono, fontSize: 10, fontWeight: 700,
+                  letterSpacing: 1, opacity: syncing ? 0.5 : 1, transition: "all 0.2s",
+                }}
+              >
+                {syncing ? "⟳ SYNCING…" : "⇄ SYNC CATALOG"}
+              </button>
+              {/* Mode toggle */}
+              <button onClick={() => setFreeMode(v => !v)}
+                style={{
+                  ...row(6), padding: "5px 14px", borderRadius: BR.pill, cursor: "pointer",
+                  background: freeMode ? `${C.gold}22` : `${C.muted}15`,
+                  border: `1px solid ${freeMode ? C.gold + "55" : C.border}`,
+                  color: freeMode ? C.gold : C.muted, fontFamily: F.mono, fontSize: 10, fontWeight: 700,
+                  letterSpacing: 1, transition: "all 0.2s",
+                }}
+              >
+                {freeMode ? "🔓" : "🔒"} {freeMode ? "FREE SANDBOX" : "STRICT PATH"}
+              </button>
+            </div>
           </div>
+          {syncMsg && (
+            <div style={{ padding: "4px 24px", fontFamily: F.mono, fontSize: 10, color: C.teal }}>{syncMsg}</div>
+          )}
 
           {/* Tier tabs */}
           <div style={{ display: "flex", gap: 8, padding: "10px 24px", overflowX: "auto" }}>

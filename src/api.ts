@@ -123,6 +123,7 @@ export const api = {
   catalogSearch: (query: string, k?: number, role?: string, tier?: string) =>
     invoke<CatalogHit[]>("catalog_search", { query, k, role, tier }),
   catalogStats: () => invoke<CatalogStats>("catalog_stats"),
+  catalogSyncTree: () => invoke<TreeSyncResult>("catalog_sync_tree"),
 
   // ── Skill Scout ───────────────────────────────────────────────────────────
   scoutRun: (sources?: string[], limit?: number) => invoke<ScoutRunResult>("scout_run", { sources, limit }),
@@ -501,6 +502,7 @@ export interface SrReviewResult { card_id: string; rating: number; stability?: n
 // ── Catalog / Scout ───────────────────────────────────────────────────────────
 export interface CatalogHit { id: string; skill: string; skill_slug: string; topic: string; subtopic: string; tier: string; roles: string[]; max_level?: number; prerequisites: string; score: number; }
 export interface CatalogStats { ingested: boolean; subtopics: number; skills: number; by_tier?: Record<string, number>; }
+export interface TreeSyncResult { roles_created: number; links_created: number; tiers_set: number; matched: number; unmatched: string[]; }
 export interface ScoutRunResult { candidates: number; proposed: number; skipped_covered: number; skipped_foreign: number; duplicates: number; }
 export interface ScoutPlacement { skill: string; skill_slug?: string; topic: string; tier: string; roles: string[]; }
 export interface ScoutNeighbor { skill: string; topic: string; subtopic: string; tier: string; score: number; }
