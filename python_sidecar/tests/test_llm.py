@@ -115,13 +115,35 @@ async def test_chat_skill_context_shapes_system_prompt(test_db, monkeypatch):
     assert "pytorch" in capture[0][0]["content"]
 
 
-async def test_chat_vault_context_501_until_b10(test_db):
+async def test_chat_vault_context_injects_notes(test_db, monkeypatch):
+    # B10 landed (D11): vault context retrieves chunks and prepends them
+    from search import store as vault_store
+    monkeypatch.setattr(vault_store, "search_chunks", lambda q, top_k=4: [
+        {"path": "/v/attention.md", "title": "Attention Notes", "tags": [],
+         "chunk_index": 0, "chunk_text": "Self-attention weighs token pairs.", "score": 0.91},
+    ])
+    capture: list = []
+    monkeypatch.setattr(llm, "_ollama_chat", _fake_ollama("From your notes: ...", capture))
+    out = await llm.chat(llm.ChatIn(
+        messages=[llm.ChatMessage(role="user", content="what do my notes say about attention?")],
+        context_type="vault",
+    ))
+    assert out["reply"].startswith("From your notes")
+    system = capture[0][0]["content"]
+    assert "Attention Notes" in system and "Self-attention weighs token pairs." in system
+
+
+async def test_chat_vault_context_unindexed_409(test_db, monkeypatch):
+    from search import store as vault_store
+    def boom(q, top_k=4):
+        raise FileNotFoundError("vault not indexed yet")
+    monkeypatch.setattr(vault_store, "search_chunks", boom)
     with pytest.raises(HTTPException) as e:
         await llm.chat(llm.ChatIn(
             messages=[llm.ChatMessage(role="user", content="notes?")],
             context_type="vault",
         ))
-    assert e.value.status_code == 501
+    assert e.value.status_code == 409
 
 
 async def test_chat_ollama_down_503(test_db, monkeypatch):

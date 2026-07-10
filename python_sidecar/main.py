@@ -27,7 +27,7 @@ from sr.router       import router as sr_router
 from catalog.router  import router as catalog_router
 from scout.router    import router as scout_router
 from analytics.router import router as analytics_router
-# from search.router   import router as search_router
+from search.router   import router as search_router
 from llm.router      import router as llm_router
 # from analytics.router import router as analytics_router
 # from sync.router     import router as sync_router
@@ -119,7 +119,7 @@ app.include_router(sr_router,        prefix="/sr",        tags=["Spaced Repetiti
 app.include_router(catalog_router,   prefix="/catalog",   tags=["Skills Catalog"])
 app.include_router(scout_router,     prefix="/scout",     tags=["Skill Scout"])
 app.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
-# app.include_router(search_router,    prefix="/search",    tags=["Semantic Search"])
+app.include_router(search_router,    prefix="/search",    tags=["Semantic Search"])
 app.include_router(llm_router,       prefix="/llm",       tags=["LLM / Ollama"])
 # app.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
 # app.include_router(sync_router,      prefix="/sync",      tags=["Obsidian Sync"])

@@ -22,9 +22,6 @@ from pydantic import BaseModel, Field
 from config import settings
 from db import get_db
 
-# NOTE: vault RAG (search.indexer) deliberately NOT imported — it pulls the
-# optional faiss dep and would kill sidecar boot. Lands with B10 (D11).
-
 router = APIRouter()
 
 OLLAMA_BASE = settings.OLLAMA_URL
@@ -129,11 +126,22 @@ async def chat(body: ChatIn):
     session_id = body.session_id or str(uuid.uuid4())
     db         = await get_db()
 
-    if body.context_type == "vault":
-        raise HTTPException(501, "Vault context lands with the vault search slice (B10).")
-
     # ── Build system prompt ───────────────────────────────────────────────
     system = _system_prompt(body.context_type, body.skill_id)
+
+    # ── Vault RAG context (B10/D11): retrieve the learner's own notes ────
+    if body.context_type == "vault" and body.messages:
+        from search import store as vault_store  # lazy — LanceDB import
+        try:
+            hits = vault_store.search_chunks(body.messages[-1].content, top_k=4)
+        except FileNotFoundError:
+            raise HTTPException(
+                409, "vault not indexed yet — set the vault path and reindex in the Vault view")
+        if hits:
+            system += "\n\n## Relevant vault notes:\n" + "\n---\n".join(
+                f"**{h['title']}** (score:{h['score']:.2f})\n{h['chunk_text']}"
+                for h in hits
+            )
 
     # ── Load conversation history from DB ─────────────────────────────────
     async with db.execute(
