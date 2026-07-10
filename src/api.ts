@@ -132,13 +132,14 @@ export const api = {
     invoke<ScoutDecision>("scout_decide", { proposalId, action, ...edits }),
   scoutFewshot: () => invoke<ScoutFewshot[]>("scout_fewshot"),
 
-  // searchVault: (query: string, top_k?: number) => invoke<SearchResult[]>("search_vault", { query, top_k }),
-  // searchRelated: (skill_id: string) => invoke<SearchResult[]>("search_related", { skill_id }),
-  // searchReindex: () => invoke<void>("search_reindex"),
-  // searchStats: () => invoke<SearchStats>("search_stats"),
+  // ── Vault semantic search (B10) — wire truth: python_sidecar/search/router.py
+  searchVault: (query: string, topK?: number) => invoke<SearchResult[]>("search_vault", { query, topK }),
+  searchRelated: (skillId: string, topK?: number) => invoke<SearchResult[]>("search_related", { skillId, topK }),
+  searchReindex: () => invoke<SearchStats>("search_reindex"),
+  searchStats: () => invoke<SearchStats>("search_stats"),
 
   // ── AI Tutor (Ollama, B8) — wire truth: python_sidecar/llm/router.py ──────
-  llmChat: (messages: ChatMsg[], opts?: { model?: string; contextType?: "general" | "skill"; skillId?: string; sessionId?: string }) =>
+  llmChat: (messages: ChatMsg[], opts?: { model?: string; contextType?: "general" | "skill" | "vault"; skillId?: string; sessionId?: string }) =>
     invoke<LlmChatResponse>("llm_chat", { messages, model: opts?.model, contextType: opts?.contextType, skillId: opts?.skillId, sessionId: opts?.sessionId }),
   llmPractice: (subtopicId: string, pathId: string, difficulty?: "easy" | "medium" | "hard", count?: number, model?: string) =>
     invoke<LlmPracticeResult>("llm_practice", { subtopicId, pathId, difficulty, count, model }),
@@ -511,8 +512,8 @@ export interface ScoutDecision { status: string; placement?: Record<string, unkn
 export interface ScoutFewshot { title: string; summary: string; proposed: { skill: string; topic: string; tier: string }; decision: string; final?: Record<string, unknown>; }
 
 // ── Search / LLM / Analytics ──────────────────────────────────────────────────
-export interface SearchResult { path: string; title: string; chunk: string; score: number; }
-export interface SearchStats { indexed_chunks: number; last_built?: string; }
+export interface SearchResult { path: string; title: string; tags: string[]; chunk_index: number; chunk_text: string; score: number; }
+export interface SearchStats { indexed?: boolean; indexed_chunks: number; unique_notes: number; }
 export interface ChatMsg { role: "user" | "assistant" | "system"; content: string; }
 export interface LlmChatResponse { reply: string; session_id: string; model: string; }
 export interface LlmPracticeResult { problems: PracticeProblem[]; count: number; model: string; }

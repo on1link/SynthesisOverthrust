@@ -143,7 +143,7 @@ function ChatTab({ model, nodes }: { model: string; nodes: SkillNode[] }) {
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [sessionId, setSessionId] = useState<string | undefined>();
-  const [contextType, setContextType] = useState<"general" | "skill">("general");
+  const [contextType, setContextType] = useState<"general" | "skill" | "vault">("general");
   const [skillId, setSkillId] = useState("");
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -179,16 +179,17 @@ function ChatTab({ model, nodes }: { model: string; nodes: SkillNode[] }) {
       {/* Context switcher */}
       <div style={{ ...row(8), flexWrap: "wrap" }}>
         <span style={{ fontFamily: F.display, fontSize: 10, color: C.muted, letterSpacing: 2 }}>CONTEXT:</span>
-        {(["general", "skill"] as const).map(ct => (
+        {(["general", "skill", "vault"] as const).map(ct => (
           <button key={ct} onClick={() => setContextType(ct)}
             style={{ ...btn(contextType === ct ? C.accent : C.muted, true), opacity: contextType === ct ? 1 : 0.4 }}>
-            {ct === "general" ? "🧠 General" : "⬡ Skill"}
+            {ct === "general" ? "🧠 General" : ct === "skill" ? "⬡ Skill" : "📓 Vault"}
           </button>
         ))}
-        <button disabled title="Vault RAG lands with the vault search slice (B10)"
-          style={{ ...btn(C.muted, true), opacity: 0.25, cursor: "not-allowed" }}>
-          📓 Vault RAG (soon)
-        </button>
+        {contextType === "vault" && (
+          <span style={{ fontFamily: F.body, fontSize: 11, color: C.muted }}>
+            answers cite your indexed notes — reindex in the Vault view first
+          </span>
+        )}
         {contextType === "skill" && (
           <select value={skillId} onChange={e => setSkillId(e.target.value)} style={selStyle}>
             <option value="">— pick a skill —</option>

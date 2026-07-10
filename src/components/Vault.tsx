@@ -3,8 +3,9 @@
 // Obsidian vault browser — connect, browse, preview, write
 // ============================================================
 
-import React, { useState } from "react";
-import type { VaultNote } from "../api";
+import React, { useEffect, useState } from "react";
+import type { SearchResult, SearchStats, VaultNote } from "../api";
+import { api } from "../api";
 import type { UseGameState } from "../hooks/useGameState";
 import {
   C, F,
@@ -29,12 +30,54 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(false);
+  const [semantic, setSemantic] = useState(false);
+  const [semResults, setSemResults] = useState<SearchResult[] | null>(null);
+  const [semBusy, setSemBusy] = useState(false);
+  const [semMsg, setSemMsg] = useState<string | null>(null);
+  const [stats, setStats] = useState<SearchStats | null>(null);
+  const [reindexing, setReindexing] = useState(false);
+
+  useEffect(() => {
+    api.searchStats().then(setStats).catch(() => setStats(null));
+  }, []);
 
   const handleConnect = async () => {
     if (!vaultInput.trim()) return;
     await setVaultPath(vaultInput.trim());
     setVaultInput("");
   };
+
+  const handleReindex = async () => {
+    setReindexing(true);
+    setSemMsg(null);
+    try {
+      const s = await api.searchReindex();
+      setStats({ ...s, indexed: true });
+      setSemMsg(`indexed ${s.indexed_chunks} chunks from ${s.unique_notes} notes`);
+    } catch (e) {
+      setSemMsg(`⚠ ${String(e)}`);
+    } finally {
+      setReindexing(false);
+    }
+  };
+
+  const runSemantic = async () => {
+    if (!search.trim()) return;
+    setSemBusy(true);
+    setSemMsg(null);
+    try {
+      setSemResults(await api.searchVault(search.trim(), 8));
+    } catch (e) {
+      setSemResults(null);
+      setSemMsg(`⚠ ${String(e)}`);
+    } finally {
+      setSemBusy(false);
+    }
+  };
+
+  const openPath = (path: string, title: string) =>
+    handleOpenNote(vaultNotes.find(n => n.path === path)
+      ?? { path, title, word_count: 0, modified_at: "" });
 
   const handleOpenNote = async (note: VaultNote) => {
     setSelNote(note);
@@ -82,8 +125,19 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
         <div style={row(10)}>
           <span style={tag(C.teal)}>{vaultNotes.length} notes</span>
           <span style={tag(C.purple)}>{totalWords.toLocaleString()} words</span>
+          <span style={tag(C.gold)}>
+            {stats?.indexed ? `${stats.indexed_chunks} chunks indexed` : "not indexed"}
+          </span>
+          {vaultNotes.length > 0 && (
+            <button className="nf-btn" onClick={handleReindex} disabled={reindexing}
+              style={{ ...btn(C.gold, true), opacity: reindexing ? 0.5 : 1 }}>
+              {reindexing ? "⟳ Indexing…" : "⚡ Reindex"}
+            </button>
+          )}
         </div>
       </div>
+
+      {semMsg && <div style={{ ...mono(11, C.gold) }}>{semMsg}</div>}
 
       {/* Connect banner (shown when no notes yet) */}
       {vaultNotes.length === 0 && (
@@ -122,16 +176,63 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
         {/* ── Note list ─────────────────────────────────────────────── */}
         <div style={{ width: 280, flexShrink: 0, ...col_(10) }}>
 
-          {/* Search */}
+          {/* Search: substring filter ⇄ semantic */}
           {vaultNotes.length > 0 && (
-            <input
-              style={{ ...inp, borderColor: `${C.teal}44` }}
-              placeholder="Search notes…"
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-            />
+            <div style={col_(6)}>
+              <div style={row(6)}>
+                <input
+                  style={{ ...inp, flex: 1, borderColor: semantic ? `${C.purple}55` : `${C.teal}44` }}
+                  placeholder={semantic ? "Semantic search… (Enter)" : "Filter notes…"}
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  onKeyDown={e => semantic && e.key === "Enter" && runSemantic()}
+                />
+                <button className="nf-btn"
+                  title={semantic ? "Semantic (meaning) search — click for name filter" : "Name filter — click for semantic search"}
+                  onClick={() => { setSemantic(v => !v); setSemResults(null); setSemMsg(null); }}
+                  style={btn(semantic ? C.purple : C.muted, true)}>
+                  {semantic ? "✨" : "🔤"}
+                </button>
+              </div>
+              {semantic && (
+                <div style={{ ...mono(9, C.muted) }}>
+                  {semBusy ? "searching…" : "meaning-based search over indexed chunks"}
+                </div>
+              )}
+            </div>
           )}
 
+          {/* Semantic results */}
+          {semantic && semResults && (
+            <div style={{ ...card(C.purple), padding: "8px 6px", maxHeight: 520, overflowY: "auto" }}>
+              {semResults.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 24, color: C.muted, fontFamily: F.body, fontSize: 12 }}>
+                  No semantic matches.
+                </div>
+              ) : semResults.map(r => (
+                <div key={`${r.path}#${r.chunk_index}`}
+                  className="nf-card-hover"
+                  onClick={() => openPath(r.path, r.title)}
+                  style={{
+                    padding: "10px 12px", borderRadius: 8, cursor: "pointer", marginBottom: 3,
+                    "--hover-col": C.purple, transition: "all 0.15s ease",
+                  } as React.CSSProperties}>
+                  <div style={{ ...row(6), justifyContent: "space-between" }}>
+                    <span style={{ fontFamily: F.display, fontSize: 12, fontWeight: 600, color: C.purple }}>{r.title}</span>
+                    <span style={{ ...mono(9, C.muted) }}>{r.score.toFixed(2)}</span>
+                  </div>
+                  <div style={{ fontFamily: F.body, fontSize: 11, color: C.text2, lineHeight: 1.6, margin: "4px 0" }}>
+                    {r.chunk_text.slice(0, 140)}{r.chunk_text.length > 140 ? "…" : ""}
+                  </div>
+                  <div style={{ ...row(4), flexWrap: "wrap" }}>
+                    {r.tags.slice(0, 3).map(t => <span key={t} style={tag(C.purple, true)}>#{t}</span>)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {!(semantic && semResults) && (
           <div style={{
             ...card(),
             padding: "8px 4px",
@@ -181,6 +282,7 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
               })
             )}
           </div>
+          )}
 
           {/* Reconnect option */}
           {vaultNotes.length > 0 && (
@@ -297,8 +399,8 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
                 Select a note to preview
               </div>
               <div style={{ fontFamily: F.body, fontSize: 12, color: C.muted, marginTop: 8, lineHeight: 1.7 }}>
-                Your Obsidian notes are indexed in real-time.<br />
-                Phase 2 will add semantic search and AI Q&amp;A.
+                Hit ⚡ Reindex, then use ✨ semantic search to find notes by meaning —<br />
+                or ask the AI Tutor with 📓 Vault context for answers from your own notes.
               </div>
             </div>
           )}
