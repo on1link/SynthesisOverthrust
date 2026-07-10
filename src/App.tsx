@@ -20,7 +20,7 @@ import Vault from "./components/Vault";
 import { useGameState } from "./hooks/useGameState";
 
 // ── Phase 2 views ─────────────────────────────────────────────────────────────
-// import AITutor from "./views/AITutor";
+import AITutor from "./views/AITutor";
 import Analytics from "./views/Analytics";
 import SpacedRepetition from "./views/SpacedRepetition";
 import Scout from "./views/Scout";
@@ -38,8 +38,8 @@ import { C, F } from "./tokens";
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type View =
   | "dashboard" | "skills" | "onboard" | "sr" | "scout"
-  | "grind" | "projects" | "vault" | "analytics";
-// | "vitals" (parked) | "ai"
+  | "grind" | "projects" | "vault" | "analytics" | "ai";
+// | "vitals" (parked)
 // | "graph" | "rooms" | "plugins" | "settings"
 
 // ── Sidecar status banner ─────────────────────────────────────────────────────
@@ -179,7 +179,7 @@ export default function App() {
     sr: <SpacedRepetition />,
     scout: <Scout />,
     analytics: <Analytics />,
-    // ai: <AITutor />,
+    ai: <AITutor />,
     // // Phase 3
     // graph: <KnowledgeGraph />,
     // rooms: <StudyRoom />,

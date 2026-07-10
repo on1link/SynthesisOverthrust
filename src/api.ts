@@ -136,11 +136,15 @@ export const api = {
   // searchReindex: () => invoke<void>("search_reindex"),
   // searchStats: () => invoke<SearchStats>("search_stats"),
 
-  // llmChat: (messages: ChatMsg[], model?: string, vault_context?: boolean) => invoke<LlmResponse>("llm_chat", { messages, model, vault_context }),
-  // llmPractice: (skill_id: string, difficulty?: string) => invoke<LlmPracticeResult>("llm_practice", { skill_id, difficulty }),
-  // llmExplain: (concept: string, context?: string) => invoke<string>("llm_explain", { concept, context }),
-  // llmIngestPaper: (file_path: string, write_to_vault?: boolean) => invoke<PaperDigest>("llm_ingest_paper", { file_path, write_to_vault }),
-  // llmListModels: () => invoke<string[]>("llm_list_models"),
+  // ── AI Tutor (Ollama, B8) — wire truth: python_sidecar/llm/router.py ──────
+  llmChat: (messages: ChatMsg[], opts?: { model?: string; contextType?: "general" | "skill"; skillId?: string; sessionId?: string }) =>
+    invoke<LlmChatResponse>("llm_chat", { messages, model: opts?.model, contextType: opts?.contextType, skillId: opts?.skillId, sessionId: opts?.sessionId }),
+  llmPractice: (subtopicId: string, pathId: string, difficulty?: "easy" | "medium" | "hard", count?: number, model?: string) =>
+    invoke<LlmPracticeResult>("llm_practice", { subtopicId, pathId, difficulty, count, model }),
+  llmExplain: (concept: string, targetLevel?: "beginner" | "intermediate" | "expert", analogyDomain?: string, model?: string) =>
+    invoke<LlmExplainResult>("llm_explain", { concept, targetLevel, analogyDomain, model }),
+  llmListModels: () => invoke<LlmModels>("llm_list_models"),
+  // llmIngestPaper — deferred to the vault slice (D12, B10/B14)
 
   analyticsOverview: () => invoke<AnalyticsOverview>("analytics_overview"),
   analyticsSkillVelocity: () => invoke<SkillVelocity[]>("analytics_skill_velocity"),
@@ -508,9 +512,10 @@ export interface ScoutFewshot { title: string; summary: string; proposed: { skil
 export interface SearchResult { path: string; title: string; chunk: string; score: number; }
 export interface SearchStats { indexed_chunks: number; last_built?: string; }
 export interface ChatMsg { role: "user" | "assistant" | "system"; content: string; }
-export interface LlmResponse { content: string; model: string; }
-export interface LlmPracticeResult { problem: string; hints: string[]; solution?: string; }
-export interface PaperDigest { title: string; summary: string; key_concepts: string[]; vault_path?: string; }
+export interface LlmChatResponse { reply: string; session_id: string; model: string; }
+export interface LlmPracticeResult { problems: PracticeProblem[]; count: number; model: string; }
+export interface LlmExplainResult { explanation: string; concept: string; level: string; model: string; }
+export interface LlmModels { models: string[]; error?: string; hint?: string; }
 export interface AnalyticsOverview {
   user: { xp: number; level: number; sp: number; streak: number };
   week: { xp_gained: number; tasks_done: number; tasks_created: number; completion_rate: number; grind_sessions: number; grind_xp: number };
