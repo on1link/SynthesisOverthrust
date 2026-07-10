@@ -4,7 +4,7 @@
 // ============================================================
 
 import React, { useEffect, useState } from "react";
-import type { SearchResult, SearchStats, VaultNote } from "../api";
+import type { GitStatus, SearchResult, SearchStats, SnapshotInfo, VaultNote } from "../api";
 import { api } from "../api";
 import type { UseGameState } from "../hooks/useGameState";
 import {
@@ -297,6 +297,8 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
               <button className="nf-btn" onClick={handleConnect} style={btn(C.teal, true)}>↩</button>
             </div>
           )}
+
+          <BackupCard />
         </div>
 
         {/* ── Note preview / editor ──────────────────────────────────── */}
@@ -406,6 +408,126 @@ export default function Vault({ vaultNotes, setVaultPath, readNote, writeNote }:
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ── Backup card (B12) — git commit/push + DB snapshots ─────────────────────────
+function BackupCard() {
+  const [status, setStatus] = useState<GitStatus | null>(null);
+  const [snapshots, setSnapshots] = useState<SnapshotInfo[] | null>(null);
+  const [loadErr, setLoadErr] = useState<string | null>(null);
+  const [backing, setBacking] = useState(false);
+  const [backupMsg, setBackupMsg] = useState<string | null>(null);
+  const [remoteUrl, setRemoteUrl] = useState("");
+  const [remoteBusy, setRemoteBusy] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
+  const [advMsg, setAdvMsg] = useState<string | null>(null);
+
+  const refresh = async () => {
+    try {
+      const [s, snaps] = await Promise.all([api.backupStatus(), api.backupSnapshots()]);
+      setStatus(s);
+      setSnapshots(snaps);
+      setLoadErr(null);
+    } catch (e) {
+      setLoadErr(String(e));
+    }
+  };
+
+  useEffect(() => { refresh(); }, []);
+
+  const handleBackup = async () => {
+    setBacking(true);
+    setBackupMsg(null);
+    try {
+      const r = await api.backupCommit();
+      await refresh();
+      setBackupMsg(`${r.files_changed} files · snapshot ${r.snapshot ?? "?"}`);
+    } catch (e) {
+      setBackupMsg(String(e));
+    } finally {
+      setBacking(false);
+    }
+  };
+
+  const handleSetRemote = async () => {
+    if (!remoteUrl.trim()) return;
+    setRemoteBusy(true);
+    setAdvMsg(null);
+    try {
+      await api.backupSetRemote(remoteUrl.trim());
+      await refresh();
+      setAdvMsg("remote set");
+    } catch (e) {
+      setAdvMsg(String(e));
+    } finally {
+      setRemoteBusy(false);
+    }
+  };
+
+  const handlePush = async () => {
+    setPushBusy(true);
+    setAdvMsg(null);
+    try {
+      const r = await api.backupPush();
+      setAdvMsg(r.result);
+    } catch (e) {
+      setAdvMsg(String(e));
+    } finally {
+      setPushBusy(false);
+    }
+  };
+
+  const latestSnapshot = snapshots?.[0];
+
+  return (
+    <div style={{ ...card(C.green), padding: 14, marginTop: 4 }}>
+      <div style={{ fontFamily: F.display, fontSize: 12, fontWeight: 700, color: C.green, marginBottom: 6 }}>
+        💾 Backup
+      </div>
+
+      {loadErr ? (
+        <div style={{ ...mono(10, C.red) }}>⚠ {loadErr}</div>
+      ) : status?.error ? (
+        <div style={{ ...mono(10, C.red) }}>⚠ {status.error}</div>
+      ) : (
+        <>
+          <div style={{ ...mono(10, C.muted), marginBottom: 4 }}>
+            ⎇ {status?.branch ?? "…"} · {status?.dirty ? "changes pending" : "clean"} · last: {status?.last_commit?.message ?? "never"}
+          </div>
+          <div style={{ ...mono(10, C.muted), marginBottom: 8 }}>
+            {snapshots?.length ?? 0} snapshots{latestSnapshot ? ` · latest ${latestSnapshot.sha256.slice(0, 8)}` : ""}
+          </div>
+        </>
+      )}
+
+      <button className="nf-btn" onClick={handleBackup} disabled={backing}
+        style={{ ...btn(C.green, true), opacity: backing ? 0.5 : 1, width: "100%" }}>
+        {backing ? "⟳ Backing up…" : "💾 Backup Now"}
+      </button>
+      {backupMsg && <div style={{ ...mono(10, C.gold), marginTop: 6 }}>{backupMsg}</div>}
+
+      {/* Advanced: remote + push */}
+      <div style={{ ...row(6), marginTop: 10, flexWrap: "wrap" }}>
+        <input
+          style={{ ...inp, flex: 1, minWidth: 120, fontSize: 10, padding: "5px 8px" }}
+          placeholder="git remote url…"
+          value={remoteUrl}
+          onChange={e => setRemoteUrl(e.target.value)}
+          onKeyDown={e => e.key === "Enter" && handleSetRemote()}
+        />
+        <button className="nf-btn" onClick={handleSetRemote} disabled={remoteBusy}
+          style={btn(C.muted, true)}>
+          Set remote
+        </button>
+        <button className="nf-btn" onClick={handlePush} disabled={pushBusy || !status?.has_remote}
+          title={status?.has_remote ? "Push to origin" : "Set a remote first"}
+          style={{ ...btn(C.teal, true), opacity: (pushBusy || !status?.has_remote) ? 0.5 : 1 }}>
+          ⇪ Push
+        </button>
+      </div>
+      {advMsg && <div style={{ ...mono(10, C.gold), marginTop: 6 }}>{advMsg}</div>}
     </div>
   );
 }

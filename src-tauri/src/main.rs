@@ -298,6 +298,14 @@ fn main() {
             commands_p3::graph_neighbours,
             commands_p3::graph_find_path,
             commands_p3::graph_rebuild,
+            // ── Phase 3 — Git backup (B12) ──────────────────────────────────
+            commands_p3::backup_status,
+            commands_p3::backup_log,
+            commands_p3::backup_commit,
+            commands_p3::backup_push,
+            commands_p3::backup_set_remote,
+            commands_p3::backup_snapshot_db,
+            commands_p3::backup_snapshots,
         ])
         .build(tauri::generate_context!())
         .expect("SynthesisOverthrust failed to build");

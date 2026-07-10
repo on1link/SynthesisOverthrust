@@ -25,6 +25,16 @@ pub async fn start_scheduler(pool: SqlitePool) -> Result<()> {
                 "hook": "on_daily_reset",
                 "payload": { "date": chrono::Utc::now().format("%Y-%m-%d").to_string() }
             })).await;
+            // Nightly auto-backup (D31) — best-effort, mirrors backup::maybe_auto_commit
+            let auto: Option<String> =
+                sqlx::query_scalar("SELECT value FROM config WHERE key='auto_git_commit'")
+                    .fetch_optional(&pool).await.ok().flatten();
+            if auto.as_deref() == Some("true") {
+                let _ = crate::sidecar::post("/backup/commit", serde_json::json!({
+                    "message": "nightly auto-backup"
+                })).await;
+                info!("Nightly auto-backup triggered");
+            }
         })
     })?).await?;
 

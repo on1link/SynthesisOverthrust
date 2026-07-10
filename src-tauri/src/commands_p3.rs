@@ -26,7 +26,15 @@ macro_rules! proxy_get {
 
 proxy_get!(backup_status, "/backup/status");
 proxy_get!(backup_log, "/backup/log");
-proxy_get!(backup_snapshot_db, "/backup/snapshot-db");
+proxy_get!(backup_snapshots, "/backup/snapshots");
+
+// Wire truth: /backup/snapshot-db is POST (was a proxy_get! → runtime 405)
+#[tauri::command]
+pub async fn backup_snapshot_db() -> Result<Value> {
+    post("/backup/snapshot-db", json!({}))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
 
 #[tauri::command]
 pub async fn backup_commit(message: Option<String>) -> Result<Value> {

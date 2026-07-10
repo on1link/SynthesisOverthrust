@@ -169,12 +169,13 @@ export const api = {
 
 
   backupCommit: (message?: string) => invoke<BackupResult>("backup_commit", { message }),
-  //   backupPush: () => invoke<void>("backup_push"),
-  //   backupSetRemote: (url: string) => invoke<void>("backup_set_remote", { url }),
-  //   backupLog: () => invoke<BackupLog[]>("backup_log"),
-  //   backupStatus: () => invoke<GitStatus>("backup_status"),
-  //   backupSnapshotDb: () => invoke<{ snapshot: string }>("backup_snapshot_db"),
-  // 
+  backupStatus: () => invoke<GitStatus>("backup_status"),
+  backupLog: () => invoke<BackupLog[]>("backup_log"),
+  backupPush: () => invoke<{ result: string }>("backup_push"),
+  backupSetRemote: (url: string) => invoke<{ result: string }>("backup_set_remote", { url }),
+  backupSnapshotDb: () => invoke<{ snapshot: string }>("backup_snapshot_db"),
+  backupSnapshots: () => invoke<SnapshotInfo[]>("backup_snapshots"),
+  //
   //   syncStatus: () => invoke<SyncStatus>("sync_status"),
   //   syncWriteNote: (path: string, content: string, force?: boolean) => invoke<void>("sync_write_note", { path, content, force }),
   //   syncConflicts: () => invoke<SyncConflict[]>("sync_conflicts"),
@@ -555,9 +556,10 @@ export interface RoomMessage { id: string; room_id: string; user_id: string; msg
 export interface Plugin { id: string; name: string; version: string; enabled: boolean; hooks: string[]; }
 export interface PluginEvent { plugin_id: string; hook: string; duration_ms: number; error?: string; fired_at: string; }
 export interface MobileKey { id: string; label: string; last_used?: string; created_at: string; }
-export interface BackupResult { status: string; message: string; commit_hash?: string; files_changed: number; }
-export interface BackupLog { commit_hash?: string; message: string; date: string; }
-export interface GitStatus { dirty: boolean; branch: string; has_remote: boolean; last_commit?: BackupLog; }
+export interface BackupResult { status: string; message: string; commit_hash?: string; files_changed: number; snapshot?: string; }
+export interface BackupLog { hash: string; message: string; author: string; date: string; }
+export interface GitStatus { dirty: boolean; untracked: number; branch: string; has_remote: boolean; last_commit?: BackupLog | null; error?: string; }
+export interface SnapshotInfo { name: string; size: number; sha256: string; created: string; }
 export interface SyncStatus { indexed_notes: number; pending_conflicts: number; last_backup?: string; }
 export interface SyncConflict { id: string; note_path: string; local_hash: string; remote_hash: string; resolution: string; diff_preview?: string; }
 
