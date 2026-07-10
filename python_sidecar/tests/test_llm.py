@@ -171,6 +171,35 @@ async def test_practice_tolerates_markdown_fences(test_db, monkeypatch):
     assert out["count"] == 2
 
 
+async def test_practice_tolerates_latex_backslashes(test_db, monkeypatch):
+    # Observed live (llama3.2:3b): raw LaTeX makes invalid JSON escapes (\g in \geq)
+    latex = ('[{"problem_text": "Let f(x) = \\frac{x^3}{2}, x \\geq 0. Find the limit.",'
+             ' "hints": ["L\'Hopital"], "explanation": "Use \\lim rules."}]')
+    monkeypatch.setattr(llm, "_ollama_chat", _fake_ollama(latex))
+    out = await llm.generate_practice(llm.PracticeIn(subtopic_id="10", path_id="mle"))
+    assert out["count"] == 1
+    assert "\\frac{x^3}{2}" in out["problems"][0]["problem_text"]
+    assert "x \\geq 0" in out["problems"][0]["problem_text"]
+
+
+async def test_practice_tolerates_latex_linebreak_pairs(test_db, monkeypatch):
+    # Observed live: piecewise \begin{cases} ... \\ ... — the \\ pair must be
+    # consumed as a unit by the repair pass, not re-doubled
+    cases = ('[{"problem_text": "f(x) = \\begin{cases} x^2 if x >= 0 \\\\ -x^2 else \\end{cases}",'
+             ' "hints": [], "explanation": "one-sided limits"}]')
+    monkeypatch.setattr(llm, "_ollama_chat", _fake_ollama(cases))
+    out = await llm.generate_practice(llm.PracticeIn(subtopic_id="10", path_id="mle"))
+    assert out["count"] == 1
+    assert "\\begin{cases}" in out["problems"][0]["problem_text"]
+
+
+async def test_practice_tolerates_dict_wrapper(test_db, monkeypatch):
+    wrapped = json.dumps({"problems": json.loads(PROBLEMS_JSON)})
+    monkeypatch.setattr(llm, "_ollama_chat", _fake_ollama(wrapped))
+    out = await llm.generate_practice(llm.PracticeIn(subtopic_id="10", path_id="mle"))
+    assert out["count"] == 2
+
+
 async def test_practice_unknown_subtopic_404(test_db, monkeypatch):
     monkeypatch.setattr(llm, "_ollama_chat", _fake_ollama(PROBLEMS_JSON))
     with pytest.raises(HTTPException) as e:

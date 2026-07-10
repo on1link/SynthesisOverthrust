@@ -263,20 +263,37 @@ Return ONLY a JSON array (no markdown, no preamble) with this structure:
     return {"problems": stored, "count": len(stored), "model": model}
 
 
-def _parse_json_array(raw: str) -> list[dict]:
-    """Parse an LLM response into a JSON array, tolerating markdown fences."""
-    clean = re.sub(r"```json?|```", "", raw).strip()
+def _try_json(text: str):
     try:
-        parsed = json.loads(clean)
+        return json.loads(text)
     except json.JSONDecodeError:
-        match  = re.search(r"\[.*\]", clean, re.DOTALL)
-        if not match:
-            return []
-        try:
-            parsed = json.loads(match.group())
-        except json.JSONDecodeError:
-            return []
-    return parsed if isinstance(parsed, list) else []
+        return None
+
+
+def _parse_json_array(raw: str) -> list[dict]:
+    """
+    Parse an LLM response into a JSON array. Tolerates markdown fences,
+    raw LaTeX backslashes (`x \\geq 0` → invalid JSON escape — observed
+    from llama3.2:3b in live QA), and a {"problems": [...]} dict wrapper.
+    """
+    clean = re.sub(r"```json?|```", "", raw).strip()
+    # Repair mode: if strict parse fails the model wasn't escaping — treat
+    # every backslash as literal except string-structural \" and \\
+    # (so \frac survives instead of becoming a form feed). Pairs must be
+    # consumed as units or the second backslash of a LaTeX \\ gets doubled.
+    repaired = re.sub(r'(\\\\|\\")|\\', lambda m: m.group(1) or "\\\\", clean)
+    for candidate in (clean, repaired):
+        parsed = _try_json(candidate)
+        if parsed is None:
+            match  = re.search(r"\[.*\]", candidate, re.DOTALL)
+            parsed = _try_json(match.group()) if match else None
+        if isinstance(parsed, list):
+            return parsed
+        if isinstance(parsed, dict):
+            for v in parsed.values():
+                if isinstance(v, list) and v and isinstance(v[0], dict):
+                    return v
+    return []
 
 
 # ── /explain ──────────────────────────────────────────────────────────────────
