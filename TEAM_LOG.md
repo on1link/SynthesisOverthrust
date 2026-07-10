@@ -865,3 +865,86 @@ Verified: pidfile == port owner, stop leaves zero orphans, port free.
 ### Dev — Commits
 - `8c97fbc` fix: harden assessment generation and grading (SO-D5)
 - `dcf0c1a` fix: sidecar.sh pidfile tracked the uv wrapper, not uvicorn (SO-D6)
+
+---
+
+## Iteration 14 — Story SO-12: knowledge graph (B11)
+
+**Date:** 2026-07-10
+**Status:** DONE (QA passed; UI walkthrough in `tauri dev` pending a display session)
+
+> As a learner, I see my knowledge as a graph — vault notes wikilinked to
+> each other, skills with prerequisite edges, SR co-review patterns — and
+> can explore neighbourhoods and paths between concepts.
+
+Multi-model routing: Fable plan (`.claude_plan.md`), Sonnet 5 executes.
+
+**Drift found (§6.6 — builder referenced three dead schema generations):**
+- `skill_node_defs` table never existed (same phantom analytics had);
+  real source is `skills` JOIN `skill_roles`.
+- Node ids `skill:{path_id}:{id}` — **path-scoped, violates §9**; hardcoded
+  4-role hex-color map violates "roles as data".
+- `sr_cards.node_id/path_id` — dead since 005 (cards keyed to items, D2).
+- `vault_index.tags` — column never existed.
+- `practice_problems.skill_id` — 009's real column set has none.
+- KnowledgeGraph.tsx invokes phantom `kg_get_graph`/`kg_rebuild` commands
+  and silently falls back to a MOCK_GRAPH; graph proxies in commands_p3
+  were never registered; `graph_rebuild` proxy is GET but route is POST.
+
+**Acceptance criteria**
+1. Builder rewritten on the real schema; **skill nodes are `skill:{id}`,
+   never path-scoped (§9)**; role attribution + colors come from the
+   `roles`/`skill_roles` tables.
+2. Graph sources v1: vault wikilinks, skill prerequisite edges, SR
+   co-review (card→item→skill, rating ≥ 3, same-day). Rebuild clears and
+   repopulates `kg_nodes`/`kg_edges` (003) — no stale accumulation.
+3. `/graph/data`, `/stats`, `/neighbours/{id}`, `/path`, `/rebuild` (POST)
+   mounted; lazy build on first request.
+4. Rust proxies registered (rebuild fixed to POST); api.ts wrappers on
+   wire-truth shapes; KnowledgeGraph view de-drifted (no mock, no phantom
+   invokes), routed under Intelligence.
+5. pytest green offline (tmp vault + in-memory DB); no network.
+
+**Decisions**
+- **D26 — graph node ids are path-unscoped** (`skill:{skill_id}`, notes by
+  path); roles are node attributes sourced from data.
+- **D27 — prereq edge source = the same table/column `get_skill_levels`
+  reads** (wire truth; executor verifies in commands.rs).
+- **D28 — concept edges (skill↔note) deferred** until note tags live in
+  SQLite (B14 vault sync); vault_index has no tags column and LanceDB-side
+  matching is too heavy for build time.
+
+**Process note:** plan written by Fable per multi-model routing; the Sonnet
+executor spawn was declined by the guide this round, so Fable executed the
+plan directly (plan file used as the spec, then deleted per Layer-4 Phase 3).
+
+### Dev — Commits
+- `df2254a` feat: knowledge graph on real schema, path-unscoped nodes
+- `03a5a7b` feat: register knowledge graph proxies — first commands_p3 wiring
+- `19ed9d6` feat: Knowledge Graph view on live data, routed under Intelligence
+
+### QA — Findings
+**pytest:** 142 passed (8 new graph tests: wikilink resolution incl. dead
+links, D26 no-path-scoped-ids regression (regex-asserted), role/color from
+data, prereq edges, co-review bump-vs-add semantics, rebuild idempotency,
+d3 export shape, router endpoints). Same 15 pre-existing (SO-D1). One test
+expectation corrected during dev: co-review between already-prereq-linked
+skills bumps the existing edge weight (+0.1) instead of adding a parallel
+sr_corev edge — inherited increment semantics, now documented by the test.
+
+**Live (QA DB + scratch vault, Q1/Q2 observed):** 20 nodes (17 skills +
+3 notes), 13 links (12 prereq = exact skill_prerequisites count, 1 wikilink
+resolved from `[[attention]]`); zero path-scoped ids; skill color `#4A90E2`
+from the roles row. Neighbours(calculus, d1) → stats+linalg; find_path
+calculus→stats length 1; calculus→deep_learning honestly "No path found"
+(deep_learning has no seeded prereq chain — data, not defect). Double
+rebuild → kg_nodes/kg_edges counts stable (20/13).
+
+**Rust/TS:** cargo 0 errors (urlencoding helper shared p2→p3); tsc —
+KnowledgeGraph.tsx now CLEAN (leaves the SO-D2 noise list, debt −1);
+vite build OK.
+
+**Notes**
+- Sidebar Intelligence now: Reviews · Scout · AI Tutor · Graph · Analytics.
+- Remaining backlog: B7b, B12 git backup, B13 settings, B14 obsidian sync
+  (unlocks D28 concept edges + watcher rewrite debt).
