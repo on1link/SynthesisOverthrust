@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 from .engine import SRCard, review_card, new_card_schedule
+from config import settings
 from db import get_db
 
 router = APIRouter()
@@ -284,18 +285,25 @@ async def submit_review(body: ReviewIn):
          result.prev_difficulty, result.new_difficulty,
          None, result.interval_days, delta)
     )
-    # 3. Propagate to item mastery (same upsert shape as Rust practice flow)
+    # 3. Propagate to item mastery (same upsert shape as Rust practice flow).
+    # Mastery is clamped at MASTERY_SR_CAP (D21) — above the cap only agent
+    # assessments (assess/router.py) can raise it; this clamp never lowers
+    # mastery that's already above the cap, it can only pull it back down.
     correct = 1 if body.rating >= 2 else 0
+    cap = settings.MASTERY_SR_CAP
     await db.execute(
         """INSERT INTO user_item_mastery
            (user_id, item_id, mastery, practice_count, correct_count, last_practiced)
-           VALUES (?, ?, MAX(0, MIN(100, ?)), 1, ?, datetime('now'))
+           VALUES (?, ?, MAX(0, MIN(?, ?)), 1, ?, datetime('now'))
            ON CONFLICT(user_id, item_id) DO UPDATE
-              SET mastery        = MAX(0, MIN(100, mastery + ?)),
+              SET mastery        = CASE
+                    WHEN mastery > ? THEN MAX(0, mastery + MIN(0, ?))      -- above cap: deltas can only lower toward it, floor 0
+                    ELSE MAX(0, MIN(?, mastery + ?))
+                  END,
                   practice_count = practice_count + 1,
                   correct_count  = correct_count + ?,
                   last_practiced = datetime('now')""",
-        (row["user_id"], row["item_id"], delta, correct, delta, correct)
+        (row["user_id"], row["item_id"], cap, delta, correct, cap, delta, cap, delta, correct)
     )
     await db.commit()
 

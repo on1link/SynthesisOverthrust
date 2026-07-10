@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     OLLAMA_URL:   str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3"
     EMBED_MODEL:  str = "all-MiniLM-L6-v2"
+    MASTERY_SR_CAP:    int = 80   # SR/practice ceiling; >80 needs assessment (D21)
+    ASSESS_PASS_SCORE: int = 70   # pass threshold (D25)
+    ASSESS_QUESTIONS:  int = 4    # questions per assessment
 
     # ── FAISS ─────────────────────────────────────────────────────────────────
     FAISS_INDEX: str  = str(Path.home() / f".local/share/{IDENTIFIER}/faiss.index")
