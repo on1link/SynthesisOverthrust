@@ -15,6 +15,7 @@ from typing import List, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
+from config import settings
 from db import get_db
 from catalog import store
 from catalog.parser import SubtopicRecord, _slug
@@ -155,6 +156,17 @@ async def decide(body: DecideIn):
         (topic_id, row["title"])
     )
     item_id = cur.lastrowid
+
+    # 1b. Role links + tier — without these the Skills view's INNER JOIN on
+    # skill_roles drops the skill and a NULL difficulty_id matches no tier
+    # section, so the approval was invisible in the GUI (SO-9).
+    from catalog.sync import ensure_roles, link_skill, normalize_roles, role_display_names, set_difficulty
+    async with db.execute("SELECT id FROM roles") as cur:
+        known = {r["id"].upper() for r in await cur.fetchall()}
+    codes = normalize_roles(roles, known)
+    await ensure_roles(db, codes - known, role_display_names(settings.CATALOG_PATH))
+    await link_skill(db, skill_slug, codes)
+    await set_difficulty(db, skill_slug, tier)
 
     # 2. LanceDB catalog append
     record = SubtopicRecord(

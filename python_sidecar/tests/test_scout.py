@@ -251,6 +251,94 @@ async def test_decide_validation(env):
     assert e.value.status_code == 422
 
 
+# ── SO-9: approve must surface in the Skills view (roles + tier linkage) ─────
+
+async def test_approve_links_roles_and_tier(env):
+    conn, _ = env
+    pid = await _seed_proposal(conn)
+    await scout_router.decide(scout_router.DecideIn(proposal_id=pid, action="approve"))
+
+    # role rows auto-created (lowercase ids), skill_roles linked
+    async with conn.execute(
+        "SELECT role_id FROM skill_roles WHERE skill_id='generative_ai_large_language_models' ORDER BY role_id"
+    ) as cur:
+        links = [r["role_id"] for r in await cur.fetchall()]
+    assert links == ["aie", "mle"]
+
+    # tier 2.5 → tier_2_5t so the node lands in a rendered tier section
+    async with conn.execute(
+        "SELECT difficulty_id FROM skills WHERE id='generative_ai_large_language_models'"
+    ) as cur:
+        assert (await cur.fetchone())["difficulty_id"] == "tier_2_5t"
+
+
+async def test_approve_normalizes_alias_and_wildcard(env):
+    conn, _ = env
+    await conn.executescript("""
+        INSERT INTO roles (id,name,color,bg_color,bg_alpha,sort_order)
+        VALUES ('mle','MLE','#111','#111','0.15',1), ('de','DE','#222','#222','0.15',2);
+    """)
+    pid = await _seed_proposal(conn)
+    out = await scout_router.decide(scout_router.DecideIn(
+        proposal_id=pid, action="edit",
+        skill="German Grammar", topic="Cases", tier="F", roles=["GER", "ALL"]))
+    assert out["status"] == "edited"
+
+    async with conn.execute(
+        "SELECT role_id FROM skill_roles WHERE skill_id='german_grammar' ORDER BY role_id"
+    ) as cur:
+        links = [r["role_id"] for r in await cur.fetchall()]
+    # GER → gl (alias), ALL → every known role (mle, de)
+    assert links == ["de", "gl", "mle"]
+
+
+# ── SO-9: /catalog/sync-tree mirrors catalog into SQLite ─────────────────────
+
+async def test_sync_tree_links_matching_skills(env, tmp_path, monkeypatch):
+    from catalog import router as catalog_router
+    from config import settings
+
+    conn, _ = env
+    # role display names come from the section headers of the catalog file
+    cat_file = tmp_path / "cat.md"
+    cat_file.write_text(CATALOG_FIXTURE)
+    monkeypatch.setattr(settings, "CATALOG_PATH", str(cat_file))
+
+    # SQLite skills: one matches by normalized name, one is foreign
+    await conn.executescript("""
+        INSERT INTO skills (id, name, icon) VALUES
+            ('skill_sql', 'SQL', 'db'),
+            ('skill_mystery', 'Underwater Basket Weaving', 'x');
+    """)
+
+    out = await catalog_router.sync_tree()
+    assert out["roles_created"] == 3          # mle, aie, de from the fixture catalog
+    assert out["matched"] == 1
+    assert out["unmatched"] == ["skill_mystery"]
+
+    async with conn.execute(
+        "SELECT role_id FROM skill_roles WHERE skill_id='skill_sql' ORDER BY role_id"
+    ) as cur:
+        assert [r["role_id"] for r in await cur.fetchall()] == ["de", "mle"]
+    async with conn.execute("SELECT difficulty_id FROM skills WHERE id='skill_sql'") as cur:
+        assert (await cur.fetchone())["difficulty_id"] == "tier_f"
+    async with conn.execute("SELECT name FROM roles WHERE id='mle'") as cur:
+        assert (await cur.fetchone())["name"] == "Machine Learning Engineer"
+
+    # idempotent second run
+    out2 = await catalog_router.sync_tree()
+    assert out2["roles_created"] == 0 and out2["links_created"] == 0 and out2["tiers_set"] == 0
+
+
+async def test_sync_tree_409_before_ingest(tmp_path, monkeypatch):
+    from catalog import router as catalog_router
+    from config import settings
+    monkeypatch.setattr(settings, "LANCE_DIR", str(tmp_path / "empty_lance"))
+    with pytest.raises(HTTPException) as e:
+        await catalog_router.sync_tree()
+    assert e.value.status_code == 409
+
+
 # ── Few-shot pool ─────────────────────────────────────────────────────────────
 
 async def test_fewshot_accumulates(env):

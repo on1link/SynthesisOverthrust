@@ -143,6 +143,30 @@ def search(
     return out
 
 
+def skill_meta(db_path: Optional[str] = None) -> List[dict]:
+    """
+    Per-skill metadata for the SQLite tree sync: one dict per skill_slug
+    with the union of role codes and the modal tier across its subtopics.
+    """
+    db = _connect(db_path)
+    if TABLE_NAME not in db.table_names():
+        raise FileNotFoundError("catalog table not ingested yet")
+    df = db.open_table(TABLE_NAME).to_pandas()[["skill", "skill_slug", "roles", "tier"]]
+
+    out: List[dict] = []
+    for slug, grp in df.groupby("skill_slug"):
+        codes: set = set()
+        for csv in grp["roles"]:
+            codes |= {r for r in csv.split(",") if r}
+        out.append({
+            "skill":      grp["skill"].iloc[0],
+            "skill_slug": slug,
+            "roles":      sorted(codes),
+            "tier":       grp["tier"].mode().iloc[0] if len(grp) else "",
+        })
+    return out
+
+
 def stats(db_path: Optional[str] = None) -> dict:
     db = _connect(db_path)
     if TABLE_NAME not in db.table_names():
