@@ -282,6 +282,11 @@ fn main() {
             commands_p2::llm_practice,
             commands_p2::llm_explain,
             commands_p2::llm_list_models,
+            // ── Phase 2 — Vault semantic search (B10) ───────────────────────
+            commands_p2::search_vault,
+            commands_p2::search_related,
+            commands_p2::search_reindex,
+            commands_p2::search_stats,
         ])
         .build(tauri::generate_context!())
         .expect("SynthesisOverthrust failed to build");

@@ -152,27 +152,34 @@ proxy_get!(scout_fewshot, "/scout/fewshot");
 // SEMANTIC SEARCH
 // ════════════════════════════════════════════════════════════════════════════
 
-// #[tauri::command]
-// pub async fn search_vault(query: String, top_k: Option<u32>) -> Result<Value> {
-//     let k = top_k.unwrap_or(8);
-//     get(&format!(
-//         "/search/query?q={}&top_k={k}",
-//         urlencoding::encode(&query)
-//     ))
-//     .await
-//     .map_err(|e| NfError::Sidecar(e.to_string()))
-// }
-//
-// #[tauri::command]
-// pub async fn search_related(skill_id: String, top_k: Option<u32>) -> Result<Value> {
-//     let k = top_k.unwrap_or(5);
-//     get(&format!("/search/related/{skill_id}?top_k={k}"))
-//         .await
-//         .map_err(|e| NfError::Sidecar(e.to_string()))
-// }
-//
-// proxy_get!(search_reindex, "/search/reindex");
-// proxy_get!(search_stats, "/search/stats");
+// Wire truth: python_sidecar/search/router.py — /query and /reindex are POST.
+
+#[tauri::command]
+pub async fn search_vault(query: String, top_k: Option<u32>) -> Result<Value> {
+    post(
+        "/search/query",
+        json!({"query": query, "top_k": top_k.unwrap_or(6)}),
+    )
+    .await
+    .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn search_related(skill_id: String, top_k: Option<u32>) -> Result<Value> {
+    let k = top_k.unwrap_or(5);
+    get(&format!("/search/related/{skill_id}?top_k={k}"))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+#[tauri::command]
+pub async fn search_reindex() -> Result<Value> {
+    post("/search/reindex", json!({}))
+        .await
+        .map_err(|e| NfError::Sidecar(e.to_string()))
+}
+
+proxy_get!(search_stats, "/search/stats");
 
 // ════════════════════════════════════════════════════════════════════════════
 // LLM / OLLAMA
