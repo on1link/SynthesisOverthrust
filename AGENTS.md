@@ -24,6 +24,19 @@ Senior platform engineer, three-runtime Tauri stack. Output = raw code blocks + 
 - One runtime per turn-batch. Finish + verify Rust before opening Python; finish Python before React. On domain switch: flush state to TEAM_LOG, tell user to `/clear` (see CLAUDE.md hygiene).
 - Never load two heavy contexts simultaneously (catalog file + full router set = forbidden pair).
 
+## Sub-Agent Blueprint: Agent-Sidecar-Monitor
+
+Scope: owns exactly one thing — bringing the FastAPI sidecar to a verified-healthy state on port 7731 and confirming WHICH database it serves. Nothing else. No code edits, no DB writes, no log spelunking beyond the script's own output.
+
+Toolset: `./scripts/sidecar.sh {status|start|stop|restart}` + `curl -sf localhost:7731/health`. Nothing more.
+
+Operational lifecycle (hard-bounded):
+1. CYCLE = `status` → (if unhealthy) `restart <db> <lance>` → verify `health` + logged `path=` matches the intended DB.
+2. **Maximum 3 cycles.** After the 3rd failed cycle: run `stop` (kill own subprocess via pidfile), emit a 5-line report (port owner, pidfile pid, health, logged db path, last script error), and yield to the human. No 4th attempt, ever.
+3. Immediate yield (before cycle limit) on any of: Q1 WARNING from `status` (foreign port owner — never kill it), logged `path=` pointing at the prod data dir when a QA DB was requested, or its own output exceeding ~30 lines per cycle (spike = something structural, not retryable).
+4. On ANY exit path — success, failure, or yield — the agent leaves no orphan: success keeps the pidfile-tracked process and reports its pid; failure paths call `stop` first.
+5. Never polls in a loop tighter than the script's built-in 10×1s readiness window; never schedules its own re-runs.
+
 ## Escalate to human when
 - Any write would touch prod data dir (`~/.local/share/com.synthesisoverthrust.app/`) outside the migration channel.
 - Port 7731 owned by a process you didn't start (rule Q1).

@@ -32,6 +32,32 @@
 3. If bundling: build binary per-target, drop into `src-tauri/binaries/`, match triple exactly (`rustc -vV | grep host`).
 4. Smoke: spawn binary, poll `GET /health` (sidecar.rs pattern), then `GET /status`.
 
+## Automated Skills for High-Frequency Processes
+
+### HFP-1 — Sidecar lifecycle (the #1 observed token burn)
+Selector (2 lines): invoke ONLY when starting/stopping/checking the sidecar process itself (Q2 restarts, QA boots, port conflicts).
+Never invoke for code edits to sidecar modules — that's the BACKEND workflow.
+
+Linear workflow — one command per step, no ad-hoc pkill/nohup:
+1. `./scripts/sidecar.sh status` — port owner + pidfile + health in ONE line. If it prints the Q1 WARNING (foreign owner), STOP and hand to human.
+2. `./scripts/sidecar.sh restart [db] [lance]` — targeted stop (pidfile only, never `pkill -f`), correct-cwd start, bounded 10s readiness poll. QA always passes explicit db/lance args; omitting them = prod DB, deliberately loud in output.
+3. On failure the script prints the last 3 log lines itself — do NOT tail the log again.
+Forbidden (all caused real incidents): `pkill -f uvicorn` (exit-144 self-kill, killed own launches), bare `nohup uvicorn` from repo root (ASGI import error), assuming a bind succeeded (silent conflict wrote QA data to prod DB, iteration 4).
+
+Lightweight status without heavy dumps: `curl -sf -m 3 localhost:7731/health` (liveness), `ss -tlnp | grep :7731` (ownership), `grep -o 'path=[^ ]*' <log> | tail -1` (which DB). Never `/status` for liveness (does DB work), never full log reads.
+
+### HFP-2 — IPC contract drift check (the #1 observed rework source)
+Selector (2 lines): invoke ONLY after changing a pydantic model, a Rust proxy signature, or an api.ts interface.
+Never invoke during pure styling/layout work.
+
+Confirmed drift cases to date: quality→rating (0-5→1-4), XpResult.xp_awarded→xp_gained, Project.project_type/completed_at (phantom), VaultNote.tags (phantom), AnalyticsOverview flat→nested + avg_quality→avg_rating. Root cause: three sources of truth (pydantic, Rust json!, TS interface).
+
+Linear check, greps only:
+1. `grep -n "class <Model>" -A 12 python_sidecar/<mod>/router.py` — pydantic = wire truth.
+2. `grep -n "interface <Name>" src/api.ts` — field names must match 1:1 (snake_case in bodies).
+3. `grep -n "<command_name>" src-tauri/src/commands*.rs` — Rust arg names snake_case; then confirm the api.ts wrapper invokes with camelCase keys (Tauri converts).
+4. For Rust-direct commands (no sidecar): `grep -n "json!({" -A 6` on the command — that json! block, not the TS interface, is wire truth.
+
 ## Layer 3 — On-Demand References (do NOT load upfront)
 Open these ONLY on an explicit compile/payload-mismatch error naming them:
 - Tauri config: `grep -n <key> src-tauri/tauri.conf.json` (never cat whole file).
