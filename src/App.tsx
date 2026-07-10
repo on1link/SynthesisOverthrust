@@ -26,7 +26,7 @@ import SpacedRepetition from "./views/SpacedRepetition";
 import Scout from "./views/Scout";
 
 // ── Phase 3 views ─────────────────────────────────────────────────────────────
-// import KnowledgeGraph from "./views/KnowledgeGraph";
+import KnowledgeGraph from "./views/KnowledgeGraph";
 // import PluginManager from "./views/PluginManager";
 // import Settings from "./views/Settings";
 // import StudyRoom from "./views/StudyRoom";
@@ -38,9 +38,9 @@ import { C, F } from "./tokens";
 // ── Types ─────────────────────────────────────────────────────────────────────
 export type View =
   | "dashboard" | "skills" | "onboard" | "sr" | "scout"
-  | "grind" | "projects" | "vault" | "analytics" | "ai";
+  | "grind" | "projects" | "vault" | "analytics" | "ai" | "graph";
 // | "vitals" (parked)
-// | "graph" | "rooms" | "plugins" | "settings"
+// | "rooms" | "plugins" | "settings"
 
 // ── Sidecar status banner ─────────────────────────────────────────────────────
 function SidecarBanner({ status }: { status: string }) {
@@ -180,8 +180,8 @@ export default function App() {
     scout: <Scout />,
     analytics: <Analytics />,
     ai: <AITutor />,
-    // // Phase 3
-    // graph: <KnowledgeGraph />,
+    // Phase 3
+    graph: <KnowledgeGraph />,
     // rooms: <StudyRoom />,
     // plugins: <PluginManager />,
     // settings: <Settings />,

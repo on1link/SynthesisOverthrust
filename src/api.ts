@@ -181,11 +181,12 @@ export const api = {
   //   syncResolve: (note_path: string, resolution: string) => invoke<void>("sync_resolve", { note_path, resolution }),
   //   syncReindexVault: () => invoke<{ reindexed: number }>("sync_reindex_vault"),
   // 
-  //   graphData: () => invoke<GraphData>("graph_data"),
-  //   graphStats: () => invoke<GraphStats>("graph_stats"),
-  //   graphNeighbours: (node_id: string, depth?: number) => invoke<GraphData>("graph_neighbours", { node_id, depth }),
-  //   graphRebuild: () => invoke<void>("graph_rebuild"),
-  //   graphFindPath: (src: string, dst: string) => invoke<{ path: string[] }>("graph_find_path", { src, dst }),
+  // ── Knowledge graph (B11) — wire truth: python_sidecar/graph/{router,builder}.py
+  graphData: () => invoke<GraphData>("graph_data"),
+  graphStats: () => invoke<GraphStats>("graph_stats"),
+  graphNeighbours: (nodeId: string, depth?: number) => invoke<GraphData>("graph_neighbours", { nodeId, depth }),
+  graphRebuild: () => invoke<{ status: string }>("graph_rebuild"),
+  graphFindPath: (src: string, dst: string) => invoke<{ path: string[]; length?: number; error?: string }>("graph_find_path", { src, dst }),
   // 
   //   collabListRooms: () => invoke<Room[]>("collab_list_rooms"),
   //   collabCreateRoom: (name: string, topic?: string, room_id?: string) => invoke<Room>("collab_create_room", { name, topic, room_id }),
@@ -546,9 +547,9 @@ export interface SleepCorrelation { points: { date: string; hours: number; quali
 
 // ── Phase 3 ───────────────────────────────────────────────────────────────────
 export interface GraphData { nodes: GraphNode[]; links: GraphLink[]; }
-export interface GraphNode { id: string; label: string; type: string; color: string; degree: number; }
+export interface GraphNode { id: string; index: number; label: string; type: string; roles: string[]; color: string; tags: string[]; degree: number; in_degree: number; }
 export interface GraphLink { source: number; target: number; type: string; weight: number; }
-export interface GraphStats { nodes: number; edges: number; density: number; components: number; }
+export interface GraphStats { nodes: number; edges: number; density?: number; components?: number; top_nodes?: { id: string; centrality: number }[]; }
 export interface Room { room_id: string; name: string; topic: string; members: number; full: boolean; }
 export interface RoomMessage { id: string; room_id: string; user_id: string; msg_type: string; content: string; created_at: string; }
 export interface Plugin { id: string; name: string; version: string; enabled: boolean; hooks: string[]; }

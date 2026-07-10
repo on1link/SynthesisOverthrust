@@ -5,16 +5,17 @@
 // Click to inspect, drag to rearrange, scroll to zoom.
 // ============================================================
 
-import { useEffect, useRef, useState } from "react";
-// 'invoke' ahora vive en el core
-import { invoke } from "@tauri-apps/api/core";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { api } from "../api";
+import type { GraphData } from "../api";
 import { C, F } from "../tokens";
 
 interface GraphNode {
   id: string;
   label: string;
   type: "skill" | "note" | "concept" | "paper" | "project";
-  path_id?: string;
+  roles: string[];
+  color?: string;
   weight: number;
   x?: number;
   y?: number;
@@ -38,44 +39,26 @@ const TYPE_COL: Record<string, string> = {
 const TYPE_ICON: Record<string, string> = {
   skill: "⬡", note: "📓", concept: "💡", paper: "📄", project: "🗂",
 };
-const PATH_COL: Record<string, string> = { mle: C.mle, de: C.de, ds: C.ds };
 
+// Wire truth: builder edge types (wikilink, skill_prereq, sr_corev)
 const EDGE_COL: Record<string, string> = {
-  prerequisite: "#ffffff18", related: "#00e5ff22",
-  covers: "#ffc10722", cites: "#9b59ff22",
-  part_of: "#00ff8822",
+  skill_prereq: "#ffffff18", wikilink: "#00e5ff22", sr_corev: "#ffc10722",
 };
 
-// ── Mock data for preview ─────────────────────────────────────────────────────
-const MOCK_GRAPH = {
-  nodes: [
-    { id: "python", label: "Python", type: "skill", path_id: "mle", weight: 40 },
-    { id: "pytorch", label: "PyTorch", type: "skill", path_id: "mle", weight: 40 },
-    { id: "nn", label: "Neural Nets", type: "skill", path_id: "mle", weight: 30 },
-    { id: "transformers", label: "Transformers", type: "skill", path_id: "mle", weight: 20 },
-    { id: "stats", label: "Statistics", type: "skill", path_id: "mle", weight: 20 },
-    { id: "numpy", label: "NumPy", type: "skill", path_id: "mle", weight: 30 },
-    { id: "cuda", label: "CUDA/GPU", type: "skill", path_id: "mle", weight: 10 },
-    { id: "n1", label: "Attention Is All You Need", type: "paper", weight: 25 },
-    { id: "n2", label: "PyTorch Notes", type: "note", weight: 15 },
-    { id: "n3", label: "Backprop Intuition", type: "note", weight: 12 },
-    { id: "n4", label: "ML System Design", type: "project", weight: 20 },
-    { id: "n5", label: "NLP Basics", type: "concept", weight: 18 },
-  ],
-  edges: [
-    { source: "python", target: "pytorch", type: "prerequisite", weight: 1.5 },
-    { source: "numpy", target: "pytorch", type: "prerequisite", weight: 1.2 },
-    { source: "stats", target: "nn", type: "prerequisite", weight: 1.0 },
-    { source: "pytorch", target: "nn", type: "prerequisite", weight: 1.5 },
-    { source: "nn", target: "transformers", type: "prerequisite", weight: 1.3 },
-    { source: "nn", target: "cuda", type: "related", weight: 0.8 },
-    { source: "n1", target: "transformers", type: "covers", weight: 1.0 },
-    { source: "n2", target: "pytorch", type: "covers", weight: 0.9 },
-    { source: "n3", target: "nn", type: "covers", weight: 0.8 },
-    { source: "n4", target: "pytorch", type: "part_of", weight: 0.7 },
-    { source: "n5", target: "transformers", type: "related", weight: 0.6 },
-  ],
-};
+// Wire GraphData (links with numeric indexes) → internal string-id edges;
+// node size from degree (the server sends no weight).
+function fromWire(d: GraphData): { nodes: GraphNode[]; edges: GraphEdge[] } {
+  return {
+    nodes: d.nodes.map(n => ({
+      id: n.id, label: n.label, type: n.type as GraphNode["type"],
+      roles: n.roles ?? [], color: n.color, weight: (n.degree + 1) * 6,
+    })),
+    edges: d.links.map(l => ({
+      source: d.nodes[l.source].id, target: d.nodes[l.target].id,
+      type: l.type, weight: l.weight,
+    })),
+  };
+}
 
 export default function KnowledgeGraph() {
   const svgRef = useRef<SVGSVGElement>(null);
@@ -87,27 +70,25 @@ export default function KnowledgeGraph() {
   const [filter, setFilter] = useState<string>("all");
   const [rebuilding, setRebuilding] = useState(false);
   const [stats, setStats] = useState({ nodes: 0, edges: 0 });
+  const [error, setError] = useState<string | null>(null);
 
-  const isTauri = typeof window !== "undefined" && !!(window as any).__TAURI__;
-
-  // ── Load graph ──────────────────────────────────────────────────────────────
-  useEffect(() => {
-    (async () => {
-      try {
-        const data = isTauri
-          ? await invoke<any>("kg_get_graph")
-          : MOCK_GRAPH;
-        const d = data.nodes?.length ? data : MOCK_GRAPH;
-        setGraphData(d);
-        setStats({ nodes: d.nodes.length, edges: d.edges.length });
-      } catch {
-        setGraphData(MOCK_GRAPH);
-        setStats({ nodes: MOCK_GRAPH.nodes.length, edges: MOCK_GRAPH.edges.length });
-      } finally {
-        setLoading(false);
-      }
-    })();
+  // ── Load graph (wire truth: api.graphData → to_d3_json shape) ───────────────
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const d = fromWire(await api.graphData());
+      setGraphData(d);
+      setStats({ nodes: d.nodes.length, edges: d.edges.length });
+    } catch (e) {
+      setError(String(e));
+      setGraphData(null);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => { load(); }, [load]);
 
   // ── D3 simulation ───────────────────────────────────────────────────────────
   useEffect(() => {
@@ -140,7 +121,7 @@ export default function KnowledgeGraph() {
 
     // Defs: arrow markers + glow filter
     const defs = mk("defs", {});
-    const arrowTypes = ["prerequisite", "related", "covers", "cites", "part_of"];
+    const arrowTypes = ["skill_prereq", "wikilink", "sr_corev"];
     arrowTypes.forEach(t => {
       const m = mk("marker", { id: `arrow-${t}`, markerWidth: 8, markerHeight: 6, refX: 16, refY: 3, orient: "auto" });
       const p = mk("polygon", { points: "0 0,8 3,0 6", fill: EDGE_COL[t]?.replace("22", "66").replace("18", "44") ?? "#ffffff33" });
@@ -195,7 +176,7 @@ export default function KnowledgeGraph() {
 
     // ── Draw nodes ────────────────────────────────────────────────────────────
     const nodeEls: SVGGElement[] = nodes.map(n => {
-      const col = n.path_id ? (PATH_COL[n.path_id] ?? TYPE_COL[n.type]) : TYPE_COL[n.type];
+      const col = (n.type === "skill" && n.color) ? n.color : TYPE_COL[n.type];
       const r = Math.max(12, Math.min(32, Math.sqrt(n.weight) * 4));
       const icon = TYPE_ICON[n.type] ?? "●";
 
@@ -366,11 +347,15 @@ export default function KnowledgeGraph() {
   const rebuild = async () => {
     setRebuilding(true);
     try {
-      await invoke("kg_rebuild");
-      const data = await invoke<any>("kg_get_graph");
-      setGraphData(data);
-      setStats({ nodes: data.nodes.length, edges: data.edges.length });
-    } catch { } finally { setRebuilding(false); }
+      await api.graphRebuild();
+      // rebuild runs as a sidecar background task — give it a beat, refetch
+      await new Promise(r => setTimeout(r, 1500));
+      await load();
+    } catch (e) {
+      setError(String(e));
+    } finally {
+      setRebuilding(false);
+    }
   };
 
   return (
@@ -383,7 +368,7 @@ export default function KnowledgeGraph() {
         </div>
         <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
           {/* Filter */}
-          {["all", "skill", "note", "paper", "project"].map(f => (
+          {["all", "skill", "note"].map(f => (
             <button key={f} onClick={() => setFilter(f)}
               style={{ padding: "6px 12px", borderRadius: 6, border: `1px solid ${filter === f ? C.gold : C.border}`, background: filter === f ? `${C.gold}18` : "transparent", color: filter === f ? C.gold : C.muted, cursor: "pointer", fontFamily: F.display, fontSize: 11, fontWeight: 700, letterSpacing: 1, textTransform: "capitalize" as const }}>
               {f === "all" ? "All" : TYPE_ICON[f] + " " + f}
@@ -401,7 +386,7 @@ export default function KnowledgeGraph() {
         {[
           { v: stats.nodes, l: "Nodes", col: C.accent },
           { v: stats.edges, l: "Connections", col: C.gold },
-          { v: graphData?.nodes.filter(n => n.type === "skill").length ?? 0, l: "Skills", col: C.mle },
+          { v: graphData?.nodes.filter(n => n.type === "skill").length ?? 0, l: "Skills", col: C.purple },
           { v: graphData?.nodes.filter(n => n.type === "note").length ?? 0, l: "Notes", col: C.teal },
         ].map(({ v, l, col }) => (
           <div key={l} style={{ padding: "8px 14px", borderRadius: 8, background: C.surface, border: `1px solid ${col}22` }}>
@@ -418,6 +403,12 @@ export default function KnowledgeGraph() {
           {loading && (
             <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: F.mono, color: C.muted, letterSpacing: 3, fontSize: 11, animation: "nf-pulse 1s ease-in-out infinite" }}>
               BUILDING GRAPH…
+            </div>
+          )}
+          {error && !loading && (
+            <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 10, fontFamily: F.mono, fontSize: 11, color: C.red, padding: 24, textAlign: "center" }}>
+              ⚠ {error}
+              <span style={{ color: C.muted }}>Is the sidecar running?</span>
             </div>
           )}
           <svg ref={svgRef} width="100%" height="100%" style={{ cursor: "grab", userSelect: "none" }} />
@@ -447,13 +438,16 @@ export default function KnowledgeGraph() {
             <div style={{ fontFamily: F.display, fontSize: 16, fontWeight: 700, color: C.text, lineHeight: 1.4 }}>
               {selected.label}
             </div>
-            {selected.path_id && (
-              <div style={{ padding: "3px 9px", borderRadius: 5, background: `${PATH_COL[selected.path_id]}18`, color: PATH_COL[selected.path_id], fontFamily: F.display, fontSize: 10, fontWeight: 700, letterSpacing: 1.5, display: "inline-block" }}>
-                {selected.path_id.toUpperCase()}
+            {selected.roles.length > 0 && (
+              <div style={{ display: "flex", gap: 5, flexWrap: "wrap" }}>
+                {selected.roles.map(r => (
+                  <span key={r} style={{ padding: "3px 9px", borderRadius: 5, background: `${selected.color ?? C.accent}18`, color: selected.color ?? C.accent, fontFamily: F.display, fontSize: 10, fontWeight: 700, letterSpacing: 1.5 }}>
+                    {r.toUpperCase()}
+                  </span>
+                ))}
               </div>
             )}
             <div style={{ fontFamily: F.body, fontSize: 12, color: C.muted, lineHeight: 1.8 }}>
-              <div>Weight: <span style={{ color: C.gold }}>{selected.weight.toFixed(1)}</span></div>
               <div>Connections: <span style={{ color: C.accent }}>
                 {graphData?.edges.filter(e => e.source === selected.id || e.target === selected.id).length ?? 0}
               </span></div>
