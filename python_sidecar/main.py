@@ -32,7 +32,7 @@ from llm.router      import router as llm_router
 from assess.router   import router as assess_router
 # from analytics.router import router as analytics_router
 # from sync.router     import router as sync_router
-# from graph.router    import router as graph_router
+from graph.router    import router as graph_router
 # from collab.router   import router as collab_router
 from plugins.router  import router as plugins_router
 # from backup.router   import router as backup_router
@@ -125,7 +125,7 @@ app.include_router(llm_router,       prefix="/llm",       tags=["LLM / Ollama"])
 app.include_router(assess_router,    prefix="/assess",    tags=["Assessments"])
 # app.include_router(analytics_router, prefix="/analytics", tags=["Analytics"])
 # app.include_router(sync_router,      prefix="/sync",      tags=["Obsidian Sync"])
-# app.include_router(graph_router,     prefix="/graph",     tags=["Knowledge Graph"])
+app.include_router(graph_router,     prefix="/graph",     tags=["Knowledge Graph"])
 # app.include_router(collab_router,    prefix="/collab",    tags=["Study Rooms"])
 app.include_router(plugins_router,   prefix="/plugins",   tags=["Plugins"])
 # app.include_router(backup_router,    prefix="/backup",    tags=["Backup"])
