@@ -78,11 +78,11 @@ def _down_ollama():
     return fake
 
 
+# Questions must pass _valid_questions (SO-D5): exact count, >= 8 words each
 QUESTIONS_JSON = json.dumps([
-    {"question": "q1", "framing": "f1"},
-    {"question": "q2", "framing": "f2"},
-    {"question": "q3", "framing": "f3"},
-    {"question": "q4", "framing": "f4"},
+    {"question": f"Explain how concept number {i} transfers to a new domain with an edge case.",
+     "framing": f"f{i}"}
+    for i in range(1, 5)
 ])
 
 
@@ -213,3 +213,62 @@ async def test_submit_fail_leaves_mastery_unchanged(test_db, monkeypatch):
         "SELECT status FROM assessments WHERE id=?", (started["assessment_id"],)
     ) as cur:
         assert (await cur.fetchone())["status"] == "failed"
+
+
+# ── SO-D5: hardening — retry, validation, model routing, score clamp ─────────
+
+def _fake_ollama_sequence(replies: list[str], calls: list | None = None):
+    """Fake returning successive canned replies (retry-path testing)."""
+    it = iter(replies)
+    async def fake(messages, model, stream=False):
+        if calls is not None:
+            calls.append((messages, model))
+        return next(it)
+    return fake
+
+
+async def test_start_retries_once_on_garbled_questions(test_db, monkeypatch):
+    calls: list = []
+    garbled = json.dumps([{"question": "q1", "framing": "f"}] * 4)   # stub questions
+    monkeypatch.setattr(assess, "_ollama_chat",
+                        _fake_ollama_sequence([garbled, QUESTIONS_JSON], calls))
+    out = await assess.start_assessment(assess.StartIn(item_id=10))
+    assert len(out["questions"]) == 4
+    assert len(calls) == 2                       # one corrective retry
+    assert "Regenerate" in calls[1][0][-1]["content"]
+
+
+async def test_start_502_when_retry_also_garbled(test_db, monkeypatch):
+    bad = json.dumps([{"question": "nope", "framing": "f"}] * 4)
+    monkeypatch.setattr(assess, "_ollama_chat", _fake_ollama_sequence([bad, bad]))
+    with pytest.raises(HTTPException) as e:
+        await assess.start_assessment(assess.StartIn(item_id=10))
+    assert e.value.status_code == 502
+    async with test_db.execute("SELECT COUNT(*) AS n FROM assessments") as cur:
+        assert (await cur.fetchone())["n"] == 0
+
+
+async def test_assess_model_setting_wins_over_default(test_db, monkeypatch):
+    from config import settings
+    monkeypatch.setattr(settings, "ASSESS_MODEL", "qwen-test:9b")
+    calls: list = []
+    monkeypatch.setattr(assess, "_ollama_chat",
+                        _fake_ollama_sequence([QUESTIONS_JSON], calls))
+    await assess.start_assessment(assess.StartIn(item_id=10))
+    assert calls[0][1] == "qwen-test:9b"         # not OLLAMA_MODEL
+
+
+async def test_submit_clamps_stray_scores(test_db, monkeypatch):
+    monkeypatch.setattr(assess, "_ollama_chat", _fake_ollama(QUESTIONS_JSON))
+    started = await assess.start_assessment(assess.StartIn(item_id=10))
+
+    stray = json.dumps([
+        {"score": 150, "feedback": "over"}, {"score": -20, "feedback": "under"},
+        {"score": "90", "feedback": "stringy"}, {"score": None, "feedback": "none"},
+    ])
+    monkeypatch.setattr(assess, "_ollama_chat", _fake_ollama(stray))
+    out = await assess.submit_assessment(assess.SubmitIn(
+        assessment_id=started["assessment_id"], answers=["a", "b", "c", "d"]
+    ))
+    assert [v["score"] for v in out["verdicts"]] == [100, 0, 90, 0]
+    assert out["score"] == 48                    # mean of clamped scores

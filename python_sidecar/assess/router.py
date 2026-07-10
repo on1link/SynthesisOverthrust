@@ -16,11 +16,27 @@ import httpx
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
-from llm.router import _ollama_chat, _parse_json_array, _resolve_model
+from llm.router import _ollama_chat, _parse_json_array
 from config import settings
 from db import get_db
 
 router = APIRouter()
+
+
+def _resolve_assess_model(requested: Optional[str]) -> str:
+    """Dedicated assessment model (SO-D5) — small models garble/grade erratically."""
+    return requested or settings.ASSESS_MODEL or settings.OLLAMA_MODEL
+
+
+def _valid_questions(questions: list) -> bool:
+    """Reject garbled generations (SO-D5): wrong count, empty/stub questions."""
+    if len(questions) != settings.ASSESS_QUESTIONS:
+        return False
+    for q in questions:
+        text = str(q.get("question", "")).strip()
+        if len(text.split()) < 8 or "�" in text:
+            return False
+    return True
 
 
 # ── Schemas ───────────────────────────────────────────────────────────────────
@@ -84,7 +100,7 @@ async def start_assessment(body: StartIn):
     if current_mastery < cap:
         raise HTTPException(409, f"keep practicing — assessments unlock at mastery {cap}")
 
-    model = _resolve_model(body.model)
+    model = _resolve_assess_model(body.model)
 
     # Variant framings (D23/D9): neighbor subtopics from the catalog feed
     # alternative domain framings into the question prompt.
@@ -110,6 +126,12 @@ Generate exactly {settings.ASSESS_QUESTIONS} open-ended questions that probe tra
 edge-case understanding of this subtopic — not rote recall. Each question must come from a
 different framing (a different domain, scenario, or angle on the same subtopic).
 
+Hard rules (SO-D5):
+- Write all math in plain ASCII: x^2, sqrt(x), cbrt(x), 1/x, ->, infinity.
+  NEVER use LaTeX commands or unicode math symbols.
+- Every question must be self-contained, well-posed, and answerable in a few
+  sentences without external material.
+
 Return ONLY a JSON array (no markdown, no preamble) with this structure:
 [
   {{"question": "...", "framing": "..."}}
@@ -121,14 +143,24 @@ Return ONLY a JSON array (no markdown, no preamble) with this structure:
         {"role": "user",   "content": prompt},
     ]
 
-    try:
-        raw = await _ollama_chat(messages, model)
-    except httpx.HTTPError as e:
-        raise HTTPException(503, f"Ollama unavailable: {e}. Ensure `ollama serve` is running.")
-
-    questions = _parse_json_array(raw)
-    if not questions:
-        raise HTTPException(502, "Ollama returned no parseable questions — try again or switch model.")
+    # One corrective retry on garbled output (SO-D5) before giving up.
+    questions: list = []
+    for attempt in range(2):
+        try:
+            raw = await _ollama_chat(messages, model)
+        except httpx.HTTPError as e:
+            raise HTTPException(503, f"Ollama unavailable: {e}. Ensure `ollama serve` is running.")
+        questions = _parse_json_array(raw)
+        if _valid_questions(questions):
+            break
+        messages = messages[:2] + [
+            {"role": "assistant", "content": raw},
+            {"role": "user", "content":
+             f"Invalid: I need exactly {settings.ASSESS_QUESTIONS} well-posed questions, "
+             "each at least one full sentence, ASCII math only, as a bare JSON array. Regenerate."},
+        ]
+    else:
+        raise HTTPException(502, "Ollama returned no usable questions — try again or switch model.")
 
     assessment_id = str(uuid.uuid4())
     await db.execute(
@@ -174,7 +206,15 @@ async def submit_assessment(body: SubmitIn):
     )
     prompt = f"""Grade a learner's answers to a mastery assessment. For each question, judge
 whether the answer shows real transfer understanding and edge-case awareness for its
-framing — not just recall. Score 0-100 with brief, specific feedback.
+framing — not just recall.
+
+Anchored rubric (SO-D5) — score each answer 0-100 on CONTENT, never on style or length:
+- 90-100: correct AND addresses edge cases / limits of the idea.
+- 70-89: substantially correct, minor gaps or imprecision.
+- 40-69: partially correct, a real misconception or a major gap.
+- 0-39: wrong or empty.
+If a question itself is malformed or unanswerable as written, grade the answer's
+reasoning charitably — a reasonable attempt at a flawed question scores at least 60.
 
 {pairs}
 
@@ -197,7 +237,14 @@ Return ONLY a JSON array (no markdown, no preamble), one entry per question in o
     if len(verdicts) != len(questions):
         raise HTTPException(502, "Ollama returned a mismatched verdict count — try again or switch model.")
 
-    score = round(sum(float(v.get("score", 0)) for v in verdicts) / len(verdicts))
+    # Clamp stray model scores into 0-100 (SO-D5)
+    for v in verdicts:
+        try:
+            v["score"] = max(0, min(100, round(float(v.get("score", 0)))))
+        except (TypeError, ValueError):
+            v["score"] = 0
+
+    score = round(sum(v["score"] for v in verdicts) / len(verdicts))
     passed = score >= settings.ASSESS_PASS_SCORE
     status = "passed" if passed else "failed"
 
